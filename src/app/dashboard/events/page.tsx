@@ -81,14 +81,12 @@ export default function EventsPage() {
         body: JSON.stringify({ eventIds: event.eventIds }),
       });
     } else {
-      // 레거시 호환: 단일 이벤트
       const floor = event.floors?.[0] || '6';
       await fetch(`/api/calendar/${event.id}?floor=${floor}`, { method: 'DELETE' });
     }
     loadEvents();
   };
 
-  // 페이지네이션
   const totalPages = Math.max(1, Math.ceil(events.length / PAGE_SIZE));
   const pagedEvents = events.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -97,19 +95,20 @@ export default function EventsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">이벤트 관리</h2>
+      <div className="flex items-center justify-between mb-4 md:mb-6">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800">이벤트 관리</h2>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+          className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
         >
-          + 이벤트 추가
+          + 추가
         </button>
       </div>
 
+      {/* 이벤트 생성 폼 */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-4 md:mb-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
               <input
@@ -142,7 +141,7 @@ export default function EventsPage() {
               placeholder="주식회사 ABC / 미팅룸 A"
             />
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">대상 층</label>
               <div className="flex gap-4 items-center h-[38px]">
@@ -187,7 +186,8 @@ export default function EventsPage() {
         </form>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      {/* 데스크탑: 테이블 */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -218,11 +218,7 @@ export default function EventsPage() {
                         <span
                           key={f}
                           className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                            f === '6'
-                              ? 'bg-blue-100 text-blue-700'
-                              : f === '8'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-gray-100 text-gray-600'
+                            f === '6' ? 'bg-blue-100 text-blue-700' : f === '8' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
                           }`}
                         >
                           {f}F
@@ -237,12 +233,7 @@ export default function EventsPage() {
                     {new Date(e.end).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(e)}
-                      className="text-red-500 hover:text-red-700 text-sm"
-                    >
-                      삭제
-                    </button>
+                    <button onClick={() => handleDelete(e)} className="text-red-500 hover:text-red-700 text-sm">삭제</button>
                   </td>
                 </tr>
               ))
@@ -250,30 +241,66 @@ export default function EventsPage() {
           </tbody>
         </table>
 
-        {/* 페이지네이션 */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
             <span className="text-sm text-gray-500">
               총 {events.length}개 중 {(page - 1) * PAGE_SIZE + 1}~{Math.min(page * PAGE_SIZE, events.length)}
             </span>
             <div className="flex gap-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                이전
-              </button>
-              <span className="px-3 py-1 text-sm text-gray-600">
-                {page} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                다음
-              </button>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">이전</button>
+              <span className="px-3 py-1 text-sm text-gray-600">{page} / {totalPages}</span>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">다음</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 모바일: 카드 목록 */}
+      <div className="md:hidden space-y-3">
+        {pagedEvents.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center text-gray-400 text-sm">
+            등록된 이벤트가 없습니다
+          </div>
+        ) : (
+          pagedEvents.map((e, idx) => (
+            <div key={`${e.id}-${idx}`} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{getTemplateLabel(e.template)}</span>
+                  <div className="flex gap-1">
+                    {(e.floors || ['?']).map((f) => (
+                      <span
+                        key={f}
+                        className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          f === '6' ? 'bg-blue-100 text-blue-700' : f === '8' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {f}F
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={() => handleDelete(e)} className="text-red-500 hover:text-red-700 text-xs">삭제</button>
+              </div>
+              <div className="font-medium text-gray-800 text-sm">{e.title}</div>
+              {e.subtitle && <div className="text-xs text-gray-500 mt-0.5">{e.subtitle}</div>}
+              <div className="text-xs text-gray-400 mt-1.5">
+                {new Date(e.start).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}{' '}
+                {new Date(e.start).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                {' ~ '}
+                {new Date(e.end).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* 모바일 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs text-gray-500">{events.length}개 중 {page}/{totalPages} 페이지</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40">이전</button>
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40">다음</button>
             </div>
           </div>
         )}
