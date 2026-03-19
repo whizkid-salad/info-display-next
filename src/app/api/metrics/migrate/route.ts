@@ -18,14 +18,17 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const supabase = getSupabaseClient();
+
+    // 기존 데이터 전체 삭제 (seed 더미 포함)
+    await supabase.from('metrics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
     // days=0 → 전체 행 가져오기
     const sheetRows = await fetchMetricsFromSheets(0);
 
     if (sheetRows.length === 0) {
-      return NextResponse.json({ ok: false, error: 'No data from spreadsheet' }, { status: 404 });
+      return NextResponse.json({ ok: false, error: 'No data from spreadsheet', cleared: true }, { status: 404 });
     }
-
-    const supabase = getSupabaseClient();
 
     // Supabase에 upsert할 행 구성
     const upsertRows = sheetRows.map((row) => ({
