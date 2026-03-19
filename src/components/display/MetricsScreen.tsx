@@ -8,12 +8,15 @@ import {
 
 const ROLLING_INTERVAL = 15000;
 
-const PRODUCT_COLORS: Record<string, string> = {
-  review: '#3b82f6',   // 파랑
-  upsell: '#22c55e',   // 초록
-  push: '#f97316',     // 주황
-  imweb: '#a855f7',    // 보라
+// 기본 테마 (config 로드 전 폴백)
+const DEFAULT_COLORS: Record<string, string> = {
+  review: '#3b82f6',
+  upsell: '#22c55e',
+  push: '#f97316',
+  imweb: '#a855f7',
 };
+const DEFAULT_GRID = 'rgba(255,255,255,0.08)';
+const DEFAULT_TEXT = 'rgba(255,255,255,0.5)';
 
 const PRODUCT_LABELS: Record<string, string> = {
   review: '리뷰',
@@ -28,6 +31,12 @@ interface Props {
   active: boolean;
 }
 
+interface ThemeConfig {
+  colors: Record<string, string>;
+  gridColor: string;
+  textColor: string;
+}
+
 function formatTimeLabel(time: string, view: string): string {
   const d = new Date(time);
   if (view === 'daily') {
@@ -37,9 +46,7 @@ function formatTimeLabel(time: string, view: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
 }
 
-/** 원본 데이터를 차트용으로 변환 */
 function transformData(rawData: any[], view: string) {
-  // 시간 구간별로 집계
   const bucketMap = new Map<string, any>();
 
   for (const row of rawData) {
@@ -69,17 +76,15 @@ function transformData(rawData: any[], view: string) {
     }
   }
 
-  // 서비스 순변동 계산 (start - stop, 프로덕트별)
   const result = Array.from(bucketMap.values()).map((b) => {
     const entry: any = { label: b.label, _time: b._time, onboarding: b.onboarding };
     for (const p of PRODUCTS) {
       entry[`${p}_live`] = b[`${p}_live`];
-      entry[`${p}_net`] = b[`${p}_start`] - b[`${p}_stop`]; // 순증감
+      entry[`${p}_net`] = b[`${p}_start`] - b[`${p}_stop`];
     }
     return entry;
   });
 
-  // 일간: 5분 간격 데이터를 1시간 단위로 샘플링 (너무 많으면)
   if (view === 'daily' && result.length > 24) {
     const sampled: any[] = [];
     const seen = new Set<string>();
@@ -96,13 +101,12 @@ function transformData(rawData: any[], view: string) {
   return result;
 }
 
-/** 커스텀 X축 틱 — 마지막 라벨 강조 */
-function CustomXTick({ x, y, payload, isLast }: any) {
+function CustomXTick({ x, y, payload, isLast, textColor }: any) {
   return (
     <text
       x={x} y={y + 16}
       textAnchor="middle"
-      fill={isLast ? '#fff' : 'rgba(255,255,255,0.5)'}
+      fill={isLast ? '#fff' : textColor}
       fontSize={isLast ? 16 : 11}
       fontWeight={isLast ? 700 : 400}
     >
@@ -111,10 +115,12 @@ function CustomXTick({ x, y, payload, isLast }: any) {
   );
 }
 
-function MetricsChart({ data, view, animKey }: { data: any[]; view: string; animKey: number }) {
+function MetricsChart({ data, view, animKey, theme }: { data: any[]; view: string; animKey: number; theme: ThemeConfig }) {
   if (!data || data.length === 0) {
     return <div style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', paddingTop: '15vh', fontSize: '1.5rem' }}>데이터 로딩 중...</div>;
   }
+
+  const { colors, gridColor, textColor } = theme;
 
   return (
     <div
@@ -126,35 +132,33 @@ function MetricsChart({ data, view, animKey }: { data: any[]; view: string; anim
     >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 30, right: 60, bottom: 30, left: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
 
           <XAxis
             dataKey="label"
             stroke="rgba(255,255,255,0.3)"
             tick={(props: any) => {
               const isLast = props.index === data.length - 1;
-              return <CustomXTick {...props} isLast={isLast} />;
+              return <CustomXTick {...props} isLast={isLast} textColor={textColor} />;
             }}
             tickLine={false}
             axisLine={{ stroke: 'rgba(255,255,255,0.15)' }}
           />
 
-          {/* 왼쪽 Y축: 바차트 (온보딩 + 순변동) */}
           <YAxis
             yAxisId="left"
             stroke="rgba(255,255,255,0.3)"
-            tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+            tick={{ fill: textColor, fontSize: 11 }}
             tickLine={false}
             axisLine={false}
             width={45}
           />
 
-          {/* 오른쪽 Y축: 라인 (라이브수) */}
           <YAxis
             yAxisId="right"
             orientation="right"
             stroke="rgba(255,255,255,0.3)"
-            tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+            tick={{ fill: textColor, fontSize: 11 }}
             tickLine={false}
             axisLine={false}
             width={50}
@@ -168,21 +172,19 @@ function MetricsChart({ data, view, animKey }: { data: any[]; view: string; anim
             labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
           />
 
-          {/* 온보딩 바 */}
           <Bar yAxisId="left" dataKey="onboarding" name="온보딩" fill="#fbbf24" radius={[3, 3, 0, 0]} barSize={12} animationDuration={1200} animationBegin={200}>
             {data.map((_, i) => (
               <Cell key={i} fillOpacity={0.15 + (0.85 * (i + 1)) / data.length} />
             ))}
           </Bar>
 
-          {/* 프로덕트별 순변동 스택 바 */}
           {PRODUCTS.map((p, pi) => (
             <Bar
               key={p}
               yAxisId="left"
               dataKey={`${p}_net`}
               name={`${PRODUCT_LABELS[p]} 순변동`}
-              fill={PRODUCT_COLORS[p]}
+              fill={colors[p] || DEFAULT_COLORS[p]}
               stackId="net"
               radius={pi === PRODUCTS.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
               barSize={12}
@@ -195,7 +197,6 @@ function MetricsChart({ data, view, animKey }: { data: any[]; view: string; anim
             </Bar>
           ))}
 
-          {/* 프로덕트별 라이브수 점선 라인 */}
           {PRODUCTS.map((p, pi) => (
             <Line
               key={`${p}_line`}
@@ -203,7 +204,7 @@ function MetricsChart({ data, view, animKey }: { data: any[]; view: string; anim
               type="monotone"
               dataKey={`${p}_live`}
               name={`${PRODUCT_LABELS[p]} 라이브`}
-              stroke={PRODUCT_COLORS[p]}
+              stroke={colors[p] || DEFAULT_COLORS[p]}
               strokeWidth={2}
               strokeDasharray="6 3"
               dot={false}
@@ -223,12 +224,40 @@ function MetricsChart({ data, view, animKey }: { data: any[]; view: string; anim
 }
 
 export default function MetricsScreen({ active }: Props) {
-  const { daily, weekly } = useMetricsPolling(300000); // 5분
+  const { daily, weekly } = useMetricsPolling(300000);
   const [currentView, setCurrentView] = useState<'daily' | 'weekly'>('daily');
   const [animKey, setAnimKey] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 10초 롤링: 일간↔주간
+  // 테마 config 로드
+  const [theme, setTheme] = useState<ThemeConfig>({
+    colors: DEFAULT_COLORS,
+    gridColor: DEFAULT_GRID,
+    textColor: DEFAULT_TEXT,
+  });
+
+  useEffect(() => {
+    async function loadTheme() {
+      try {
+        const res = await fetch('/api/metrics/config');
+        const data = await res.json();
+        if (data.ok && data.config?.theme) {
+          const t = data.config.theme;
+          setTheme({
+            colors: t.colors || DEFAULT_COLORS,
+            gridColor: t.gridColor || DEFAULT_GRID,
+            textColor: t.textColor || DEFAULT_TEXT,
+          });
+        }
+      } catch { /* 폴백 사용 */ }
+    }
+    loadTheme();
+    // 5분마다 테마 리로드 (대시보드에서 변경 시 반영)
+    const t = setInterval(loadTheme, 300000);
+    return () => clearInterval(t);
+  }, []);
+
+  // 15초 롤링: 일간↔주간
   useEffect(() => {
     if (!active) {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -250,7 +279,6 @@ export default function MetricsScreen({ active }: Props) {
   return (
     <div id="metrics-screen" className={`screen ${active ? 'active' : ''}`}>
       <div className="metrics-container">
-        {/* 헤더 */}
         <div className="metrics-header">
           <div className="metrics-title">서비스 현황</div>
           <div className="metrics-view-badge">
@@ -258,12 +286,10 @@ export default function MetricsScreen({ active }: Props) {
           </div>
         </div>
 
-        {/* 차트 */}
         <div className="metrics-chart-area">
-          <MetricsChart data={chartData} view={currentView} animKey={animKey} />
+          <MetricsChart data={chartData} view={currentView} animKey={animKey} theme={theme} />
         </div>
 
-        {/* 하단 시계 */}
         <div className="metrics-footer">
           <MetricsClock />
         </div>

@@ -13,7 +13,7 @@ import DefaultScreen from './DefaultScreen';
 
 const ROLLING_INTERVAL = 7000;
 
-export default function DisplayApp({ floor, idleMode = 'clock' }: { floor: string; idleMode?: string }) {
+export default function DisplayApp({ floor, idleMode = 'metrics' }: { floor: string; idleMode?: string }) {
   const { events, status } = useEventPolling(floor);
   const [currentEvent, setCurrentEvent] = useState<DisplayEvent | null>(null);
   const [currentScreen, setCurrentScreen] = useState<string>('idle');

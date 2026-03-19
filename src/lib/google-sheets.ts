@@ -17,9 +17,50 @@ export interface SheetConfig {
   products: Record<string, ProductMetricColumns>;
 }
 
+export interface ChartTheme {
+  preset: string;
+  colors: Record<string, string>;  // product → hex color
+  gridColor: string;
+  textColor: string;
+}
+
+export const THEME_PRESETS: Record<string, ChartTheme> = {
+  default: {
+    preset: 'default',
+    colors: { review: '#3b82f6', upsell: '#22c55e', push: '#f97316', imweb: '#a855f7' },
+    gridColor: 'rgba(255,255,255,0.08)',
+    textColor: 'rgba(255,255,255,0.5)',
+  },
+  neon: {
+    preset: 'neon',
+    colors: { review: '#0abdc6', upsell: '#ea00d9', push: '#39ff14', imweb: '#ff6ec7' },
+    gridColor: 'rgba(0,255,255,0.06)',
+    textColor: 'rgba(0,255,255,0.5)',
+  },
+  mono: {
+    preset: 'mono',
+    colors: { review: '#94a3b8', upsell: '#cbd5e1', push: '#64748b', imweb: '#e2e8f0' },
+    gridColor: 'rgba(255,255,255,0.05)',
+    textColor: 'rgba(255,255,255,0.4)',
+  },
+  ocean: {
+    preset: 'ocean',
+    colors: { review: '#06b6d4', upsell: '#0ea5e9', push: '#6366f1', imweb: '#8b5cf6' },
+    gridColor: 'rgba(99,102,241,0.08)',
+    textColor: 'rgba(147,197,253,0.5)',
+  },
+  sunset: {
+    preset: 'sunset',
+    colors: { review: '#f59e0b', upsell: '#ef4444', push: '#ec4899', imweb: '#f97316' },
+    gridColor: 'rgba(251,146,60,0.08)',
+    textColor: 'rgba(253,186,116,0.5)',
+  },
+};
+
 export interface MetricsSheetConfig {
   spreadsheetId: string;
   sheets: SheetConfig[];
+  theme?: ChartTheme;
 }
 
 const DEFAULT_CONFIG: MetricsSheetConfig = {
@@ -58,6 +99,7 @@ export async function getMetricsConfig(): Promise<MetricsSheetConfig> {
       return {
         spreadsheetId: data.spreadsheet_id,
         sheets: data.sheets as SheetConfig[],
+        theme: (data.theme as ChartTheme) || THEME_PRESETS.default,
       };
     }
   } catch {
@@ -73,6 +115,7 @@ export async function saveMetricsConfig(config: MetricsSheetConfig): Promise<voi
     id: 'default',
     spreadsheet_id: config.spreadsheetId,
     sheets: config.sheets,
+    theme: config.theme || THEME_PRESETS.default,
     updated_at: new Date().toISOString(),
   });
 }

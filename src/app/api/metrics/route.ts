@@ -19,10 +19,79 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseClient();
     const now = new Date();
 
-    // 스프레드시트 데이터는 daily granularity만 존재
-    // daily view → 최근 7일 (오늘 포함)
-    // weekly view → 최근 7일 (동일 데이터, 차트 레이블만 다름)
-    const daysBack = view === 'weekly' ? 6 : 6;
+    // ── view=raw: 데이터 뷰어용 (날짜별 피벗 테이블) ──
+    if (view === 'raw') {
+      const page = Math.max(1, Number(searchParams.get('page')) || 1);
+      const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
+      const offset = (page - 1) * limit;
+
+      // 전체 날짜 수 계산
+      const { data: countData } = await supabase
+        .from('metrics')
+        .select('recorded_at')
+        .eq('granularity', 'daily');
+
+      const uniqueDates = new Set((countData || []).map((r: any) => r.recorded_at));
+      const totalDates = uniqueDates.size;
+
+      // 날짜 목록 (최신순)
+      const sortedDates = Array.from(uniqueDates).sort().reverse();
+      const pagedDates = sortedDates.slice(offset, offset + limit);
+
+      if (pagedDates.length === 0) {
+        return NextResponse.json({
+          view: 'raw', rows: [], page, limit, totalDates, totalPages: Math.ceil(totalDates / limit),
+        });
+      }
+
+      // 해당 날짜들의 데이터 조회
+      const { data, error } = await supabase
+        .from('metrics')
+        .select('*')
+        .eq('granularity', 'daily')
+        .in('recorded_at', pagedDates)
+        .order('recorded_at', { ascending: false });
+
+      if (error) throw error;
+
+      // 날짜+제품별로 피벗
+      const rowMap = new Map<string, any>();
+      for (const r of data || []) {
+        const dateStr = new Date(r.recorded_at).toISOString().split('T')[0];
+        const key = `${dateStr}_${r.product}`;
+        if (!rowMap.has(key)) {
+          rowMap.set(key, {
+            date: dateStr,
+            product: r.product,
+            productLabel: PRODUCT_LABELS[r.product] || r.product,
+            onboarding: 0,
+            service_start: 0,
+            service_stop: 0,
+            live_count: 0,
+          });
+        }
+        const row = rowMap.get(key)!;
+        row[r.metric] = Number(r.value);
+      }
+
+      const rows = Array.from(rowMap.values()).sort((a, b) => {
+        const dc = b.date.localeCompare(a.date);
+        if (dc !== 0) return dc;
+        return PRODUCTS.indexOf(a.product) - PRODUCTS.indexOf(b.product);
+      });
+
+      return NextResponse.json({
+        view: 'raw',
+        rows,
+        page,
+        limit,
+        totalDates,
+        totalPages: Math.ceil(totalDates / limit),
+      });
+    }
+
+    // ── view=daily / weekly: 차트용 ──
+    const daysBack = 6;
     const start = new Date(now);
     start.setDate(start.getDate() - daysBack);
     start.setHours(0, 0, 0, 0);
@@ -37,7 +106,6 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // 시간별로 그룹핑하여 차트 데이터 구성
     const timeMap = new Map<string, any>();
 
     for (const row of data || []) {
@@ -50,7 +118,6 @@ export async function GET(request: NextRequest) {
       entry[key] = Number(row.value);
     }
 
-    // 정렬된 배열로 변환
     const chartData = Array.from(timeMap.values()).sort(
       (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
     );
