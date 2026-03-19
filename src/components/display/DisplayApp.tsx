@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useEventPolling } from '@/hooks/useEventPolling';
 import { DisplayEvent } from '@/types';
 import IdleScreen from './IdleScreen';
+import MetricsScreen from './MetricsScreen';
 import WelcomeScreen from './WelcomeScreen';
 import BirthdayScreen from './BirthdayScreen';
 import NoticeScreen from './NoticeScreen';
@@ -12,7 +13,7 @@ import DefaultScreen from './DefaultScreen';
 
 const ROLLING_INTERVAL = 7000;
 
-export default function DisplayApp({ floor }: { floor: string }) {
+export default function DisplayApp({ floor, idleMode = 'clock' }: { floor: string; idleMode?: string }) {
   const { events, status } = useEventPolling(floor);
   const [currentEvent, setCurrentEvent] = useState<DisplayEvent | null>(null);
   const [currentScreen, setCurrentScreen] = useState<string>('idle');
@@ -22,9 +23,7 @@ export default function DisplayApp({ floor }: { floor: string }) {
   });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle events change
   useEffect(() => {
-    // Clear previous rolling
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -37,7 +36,6 @@ export default function DisplayApp({ floor }: { floor: string }) {
       return;
     }
 
-    // Priority: welcome + interview events first
     const priorityEvents = events.filter(
       (e) => e.template === 'welcome' || e.template === 'interview'
     );
@@ -62,7 +60,6 @@ export default function DisplayApp({ floor }: { floor: string }) {
     };
   }, [events]);
 
-  // Fullscreen on click
   const handleClick = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -71,10 +68,17 @@ export default function DisplayApp({ floor }: { floor: string }) {
 
   const title = currentEvent?.title || '';
   const subtitle = currentEvent?.subtitle || '';
+  const isIdle = currentScreen === 'idle';
 
   return (
     <div id="app" onClick={handleClick}>
-      <IdleScreen active={currentScreen === 'idle'} />
+      {/* 유휴 시: clock 또는 metrics */}
+      {idleMode === 'metrics' ? (
+        <MetricsScreen active={isIdle} />
+      ) : (
+        <IdleScreen active={isIdle} />
+      )}
+
       <WelcomeScreen active={currentScreen === 'welcome'} title={title} subtitle={subtitle} />
       <BirthdayScreen active={currentScreen === 'birthday'} title={title} subtitle={subtitle} />
       <NoticeScreen active={currentScreen === 'notice'} title={title} subtitle={subtitle} />

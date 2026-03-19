@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [page, setPage] = useState(1);
   const [fullscreenFloor, setFullscreenFloor] = useState<string | null>(null);
+  const [idleModes, setIdleModes] = useState<Record<string, string>>({ '6': 'clock', '8': 'clock' });
 
   // 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
@@ -214,7 +215,17 @@ export default function DashboardPage() {
           return (
             <div key={floor} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 md:px-5 py-2.5 border-b border-gray-100 bg-gray-50">
-                <h3 className="text-base md:text-lg font-bold text-gray-800">{floor}층</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base md:text-lg font-bold text-gray-800">{floor}층</h3>
+                  <select
+                    value={idleModes[floor] || 'clock'}
+                    onChange={(e) => setIdleModes((prev) => ({ ...prev, [floor]: e.target.value }))}
+                    className="text-xs border border-gray-300 rounded-md px-1.5 py-0.5 bg-white text-gray-600"
+                  >
+                    <option value="clock">🕐 시계</option>
+                    <option value="metrics">📊 지표</option>
+                  </select>
+                </div>
                 <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                   {device ? (
                     <>
@@ -234,7 +245,7 @@ export default function DashboardPage() {
               </div>
               <div id={`preview-${floor}`} className="relative aspect-video bg-black"
                 style={fullscreenFloor === floor ? { width: '100vw', height: '100vh' } : undefined}>
-                <iframe src={`/display?floor=${floor}`} className="w-full h-full border-0" title={`${floor}층 미리보기`} />
+                <iframe src={`/display?floor=${floor}&idle=${idleModes[floor] || 'clock'}`} className="w-full h-full border-0" title={`${floor}층 미리보기`} />
                 <button onClick={() => handleFullscreen(floor)}
                   className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1.5 md:p-2 rounded-lg transition-colors z-10"
                   title="전체화면">

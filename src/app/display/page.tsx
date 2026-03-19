@@ -6,7 +6,8 @@ import DisplayApp from '@/components/display/DisplayApp';
 function DisplayContent() {
   const searchParams = useSearchParams();
   const floor = searchParams.get('floor') || '6';
-  return <DisplayApp floor={floor} />;
+  const idle = searchParams.get('idle') || 'clock';
+  return <DisplayApp floor={floor} idleMode={idle} />;
 }
 
 export default function DisplayPage() {
