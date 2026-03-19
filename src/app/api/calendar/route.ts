@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { floor, title, template, subtitle, start, end } = body;
 
+  // datetime-local 입력값 "2026-03-19T14:00" → RFC3339 "2026-03-19T14:00:00" 변환
+  const toRFC3339 = (dt: string) => (dt && dt.length === 16 ? dt + ':00' : dt);
+
   const calendarId = getFloorCalendarId(floor);
   const tag = templateToTag(template);
   const description = tag ? `${tag}\n${subtitle || ''}` : subtitle || '';
@@ -38,8 +41,8 @@ export async function POST(request: NextRequest) {
   const eventId = await createCalendarEvent(calendarId, {
     summary: title,
     description,
-    start,
-    end,
+    start: toRFC3339(start),
+    end: toRFC3339(end),
   });
 
   return NextResponse.json({ eventId }, { status: 201 });
