@@ -19,28 +19,19 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseClient();
     const now = new Date();
 
-    let timeMin: string;
-    let granularity: string;
-
-    if (view === 'weekly') {
-      // 최근 7일 daily 데이터
-      const weekAgo = new Date(now);
-      weekAgo.setDate(weekAgo.getDate() - 6);
-      weekAgo.setHours(0, 0, 0, 0);
-      timeMin = weekAgo.toISOString();
-      granularity = 'daily';
-    } else {
-      // 오늘 intraday 데이터
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      timeMin = todayStart.toISOString();
-      granularity = 'intraday';
-    }
+    // 스프레드시트 데이터는 daily granularity만 존재
+    // daily view → 최근 7일 (오늘 포함)
+    // weekly view → 최근 7일 (동일 데이터, 차트 레이블만 다름)
+    const daysBack = view === 'weekly' ? 6 : 6;
+    const start = new Date(now);
+    start.setDate(start.getDate() - daysBack);
+    start.setHours(0, 0, 0, 0);
 
     const { data, error } = await supabase
       .from('metrics')
       .select('*')
-      .eq('granularity', granularity)
-      .gte('recorded_at', timeMin)
+      .eq('granularity', 'daily')
+      .gte('recorded_at', start.toISOString())
       .lte('recorded_at', now.toISOString())
       .order('recorded_at', { ascending: true });
 

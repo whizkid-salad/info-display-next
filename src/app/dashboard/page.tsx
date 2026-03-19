@@ -30,6 +30,15 @@ export default function DashboardPage() {
   const [page, setPage] = useState(1);
   const [fullscreenFloor, setFullscreenFloor] = useState<string | null>(null);
   const [idleModes, setIdleModes] = useState<Record<string, string>>({ '6': 'clock', '8': 'clock' });
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [migrating, setMigrating] = useState(false);
+
+  // 설정 모달
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [metricsConfig, setMetricsConfig] = useState<any>(null);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configMsg, setConfigMsg] = useState('');
 
   // 모달 상태
   const [modalOpen, setModalOpen] = useState(false);
@@ -75,6 +84,94 @@ export default function DashboardPage() {
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
+
+  // 설정 로드
+  const loadConfig = async () => {
+    try {
+      const res = await fetch('/api/metrics/config');
+      const data = await res.json();
+      if (data.ok) setMetricsConfig(data.config);
+    } catch { /* ignore */ }
+  };
+
+  const openSettings = () => {
+    loadConfig();
+    setConfigMsg('');
+    setSettingsOpen(true);
+  };
+
+  const handleConfigSave = async () => {
+    if (!metricsConfig) return;
+    setConfigSaving(true);
+    setConfigMsg('');
+    try {
+      const res = await fetch('/api/metrics/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(metricsConfig),
+      });
+      const data = await res.json();
+      setConfigMsg(data.ok ? '✅ 저장 완료' : `❌ ${data.error}`);
+    } catch (err: any) {
+      setConfigMsg(`❌ ${err.message}`);
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const handleMigrate = async () => {
+    if (!confirm('전체 히스토리를 마이그레이션합니다. 시간이 걸릴 수 있습니다. 진행하시겠습니까?')) return;
+    setMigrating(true);
+    setConfigMsg('');
+    try {
+      const res = await fetch('/api/metrics/migrate', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        setConfigMsg(`✅ 마이그레이션 완료: ${data.upserted}건 (${data.dateRange?.from} ~ ${data.dateRange?.to}, ${data.days}일)`);
+      } else {
+        setConfigMsg(`❌ ${data.error}`);
+      }
+    } catch (err: any) {
+      setConfigMsg(`❌ ${err.message}`);
+    } finally {
+      setMigrating(false);
+    }
+  };
+
+  // 설정 모달: 시트 컬럼 업데이트 헬퍼
+  const updateSheetProduct = (sheetIdx: number, product: string, metric: string, value: string) => {
+    if (!metricsConfig) return;
+    const updated = JSON.parse(JSON.stringify(metricsConfig));
+    updated.sheets[sheetIdx].products[product][metric] = value.toUpperCase();
+    setMetricsConfig(updated);
+  };
+
+  const updateSheetName = (sheetIdx: number, value: string) => {
+    if (!metricsConfig) return;
+    const updated = JSON.parse(JSON.stringify(metricsConfig));
+    updated.sheets[sheetIdx].sheetName = value;
+    setMetricsConfig(updated);
+  };
+
+  // 지표 동기화 (스프레드시트 → Supabase)
+  const handleMetricsSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch('/api/metrics/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        setSyncResult(`✅ ${data.upserted}건 동기화 (${data.dates?.[0]} ~ ${data.dates?.slice(-1)[0]})`);
+      } else {
+        setSyncResult(`❌ ${data.error}`);
+      }
+    } catch (err: any) {
+      setSyncResult(`❌ ${err.message}`);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncResult(null), 5000);
+    }
+  };
 
   const getDevice = (floor: string) => devices.find((d) => d.floor === floor);
 
@@ -207,6 +304,21 @@ export default function DashboardPage() {
       {/* ===== 미리보기 + 디바이스 ===== */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl md:text-2xl font-bold text-gray-800">대시보드</h2>
+        <div className="flex items-center gap-2">
+          {syncResult && <span className="text-xs text-gray-600">{syncResult}</span>}
+          <button onClick={handleMetricsSync} disabled={syncing}
+            className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
+            {syncing ? (
+              <><svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="opacity-75"/></svg> 동기화 중...</>
+            ) : (
+              <>📊 지표 동기화</>
+            )}
+          </button>
+          <button onClick={openSettings}
+            className="bg-gray-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-gray-700 flex items-center gap-1">
+            ⚙️ 설정
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
@@ -374,6 +486,110 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ===== 설정 모달 ===== */}
+      {settingsOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSettingsOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800">📊 지표 데이터 설정</h3>
+              <button onClick={() => setSettingsOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {configMsg && (
+                <div className={`text-sm px-3 py-2 rounded-lg ${configMsg.startsWith('✅') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                  {configMsg}
+                </div>
+              )}
+
+              {/* 마이그레이션 */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h4 className="font-bold text-amber-800 text-sm mb-2">🗄️ 전체 히스토리 마이그레이션</h4>
+                <p className="text-xs text-amber-700 mb-3">스프레드시트의 모든 과거 데이터를 Supabase로 가져옵니다. 최초 1회만 실행하면 됩니다.</p>
+                <button onClick={handleMigrate} disabled={migrating}
+                  className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2">
+                  {migrating ? (
+                    <><svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="opacity-75"/></svg> 마이그레이션 중...</>
+                  ) : (
+                    <>🚀 전체 마이그레이션 실행</>
+                  )}
+                </button>
+              </div>
+
+              {/* 스프레드시트 ID */}
+              {metricsConfig && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">스프레드시트 ID</label>
+                    <input
+                      value={metricsConfig.spreadsheetId}
+                      onChange={(e) => setMetricsConfig({ ...metricsConfig, spreadsheetId: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                      placeholder="1a5DZmCpRW6BrdgkpTElJyrSswvpsFcpkFVLCgomQ2Kk"
+                    />
+                  </div>
+
+                  {/* 시트별 컬럼 매핑 */}
+                  {metricsConfig.sheets.map((sheet: any, si: number) => (
+                    <div key={si} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">시트명</label>
+                        <input
+                          value={sheet.sheetName}
+                          onChange={(e) => updateSheetName(si, e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                        />
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {Object.entries(sheet.products as Record<string, any>).map(([product, metrics]) => (
+                          <div key={product}>
+                            <div className="text-sm font-bold text-gray-700 mb-1.5">
+                              {product === 'review' ? '리뷰' : product === 'upsell' ? '업셀' : product === 'push' ? '푸시' : product === 'imweb' ? '아임웹' : product}
+                              <span className="text-xs font-normal text-gray-400 ml-1">({product})</span>
+                            </div>
+                            <div className="grid grid-cols-4 gap-2">
+                              {[
+                                { key: 'onboarding', label: '온보딩시작' },
+                                { key: 'service_start', label: '서비스개시' },
+                                { key: 'service_stop', label: '서비스중단' },
+                                { key: 'live_count', label: '누적라이브' },
+                              ].map(({ key, label }) => (
+                                <div key={key}>
+                                  <label className="block text-xs text-gray-500 mb-0.5">{label}</label>
+                                  <input
+                                    value={(metrics as any)[key] || ''}
+                                    onChange={(e) => updateSheetProduct(si, product, key, e.target.value)}
+                                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono text-center uppercase"
+                                    placeholder="A"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex gap-2 pt-2">
+                    <button onClick={handleConfigSave} disabled={configSaving}
+                      className="flex-1 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+                      {configSaving ? '저장 중...' : '매핑 저장'}
+                    </button>
+                    <button onClick={() => setSettingsOpen(false)}
+                      className="border border-gray-300 px-4 py-2.5 rounded-lg text-sm hover:bg-gray-50">닫기</button>
+                  </div>
+                </>
+              )}
+
+              {!metricsConfig && (
+                <div className="text-center text-gray-400 py-8">설정을 불러오는 중...</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== 모달 (추가/수정) ===== */}
       {modalOpen && (
