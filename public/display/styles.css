@@ -1,0 +1,311 @@
+/* 기본 리셋 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  background: #000;
+  cursor: none;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* 화면 공통 */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+}
+
+.screen.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.event-title {
+  font-size: 4rem;
+  font-weight: 700;
+  margin: 1rem 0;
+  text-align: center;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.event-subtitle {
+  font-size: 2rem;
+  opacity: 0.8;
+  text-align: center;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+/* ===== 대기 화면 ===== */
+#idle-screen {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #e2e8f0;
+}
+
+.idle-content {
+  text-align: center;
+}
+
+.idle-logo {
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  margin-bottom: 3rem;
+  opacity: 0.5;
+}
+
+.idle-clock {
+  font-size: 10rem;
+  font-weight: 200;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.idle-date {
+  font-size: 2rem;
+  font-weight: 300;
+  margin-top: 1rem;
+  opacity: 0.6;
+}
+
+/* ===== 환영 템플릿 ===== */
+#welcome-screen {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1e3a5f 100%);
+  color: #fff;
+}
+
+.welcome-content {
+  text-align: center;
+  padding: 3rem;
+}
+
+.welcome-icon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+}
+
+.welcome-label {
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
+
+#welcome-screen .event-title {
+  font-size: 5rem;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+}
+
+#welcome-screen .event-subtitle {
+  font-size: 2.2rem;
+  margin-top: 1.5rem;
+}
+
+/* ===== 생일 템플릿 ===== */
+#birthday-screen {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 50%, #ff6b6b 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 5s ease infinite;
+  color: #fff;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.birthday-content {
+  text-align: center;
+  padding: 3rem;
+  position: relative;
+  z-index: 1;
+}
+
+.birthday-icon {
+  font-size: 6rem;
+  animation: bounce 2s ease infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.birthday-label {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+#birthday-screen .event-title {
+  font-size: 5rem;
+  text-shadow: 0 3px 15px rgba(0,0,0,0.2);
+}
+
+/* Confetti */
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  animation: confettiFall linear infinite;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* ===== 공지 템플릿 ===== */
+#notice-screen {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: #1e293b;
+}
+
+.notice-content {
+  text-align: center;
+  padding: 3rem;
+  max-width: 80%;
+}
+
+.notice-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.notice-label {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #3b82f6;
+  letter-spacing: 0.2em;
+  margin-bottom: 2rem;
+}
+
+#notice-screen .event-title {
+  font-size: 4rem;
+  color: #1e293b;
+}
+
+#notice-screen .event-subtitle {
+  font-size: 2rem;
+  color: #475569;
+  margin-top: 1.5rem;
+}
+
+/* ===== 축하 템플릿 ===== */
+#celebration-screen {
+  background: linear-gradient(135deg, #a855f7 0%, #6366f1 50%, #3b82f6 100%);
+  color: #fff;
+}
+
+.celebration-content {
+  text-align: center;
+  padding: 3rem;
+}
+
+.celebration-icon {
+  font-size: 5rem;
+  animation: pulse 2s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.celebration-label {
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  margin-bottom: 2rem;
+}
+
+#celebration-screen .event-title {
+  font-size: 5rem;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+}
+
+/* ===== 기본 안내 템플릿 ===== */
+#default-screen {
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #fff;
+}
+
+.default-content {
+  text-align: center;
+  padding: 3rem;
+}
+
+.default-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.default-label {
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
+
+#default-screen .event-title {
+  font-size: 4.5rem;
+}
+
+/* ===== 연결 상태 ===== */
+.connection-status {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  z-index: 100;
+  transition: opacity 0.3s;
+}
+
+.connection-status.disconnected {
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+}
+
+.connection-status.connected {
+  background: rgba(34, 197, 94, 0.9);
+  color: #fff;
+}
