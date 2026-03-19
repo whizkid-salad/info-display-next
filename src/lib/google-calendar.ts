@@ -7,8 +7,8 @@ let calendarClient: calendar_v3.Calendar | null = null;
 function getCalendarClient(): calendar_v3.Calendar {
   if (calendarClient) return calendarClient;
 
-  const keyString = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!keyString) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY is not set');
+  const keyString = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!keyString) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set');
 
   const credentials = JSON.parse(keyString);
   const auth = new google.auth.GoogleAuth({
