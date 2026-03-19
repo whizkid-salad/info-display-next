@@ -7,6 +7,7 @@ import WelcomeScreen from './WelcomeScreen';
 import BirthdayScreen from './BirthdayScreen';
 import NoticeScreen from './NoticeScreen';
 import CelebrationScreen from './CelebrationScreen';
+import InterviewScreen from './InterviewScreen';
 import DefaultScreen from './DefaultScreen';
 
 const ROLLING_INTERVAL = 7000;
@@ -36,9 +37,11 @@ export default function DisplayApp({ floor }: { floor: string }) {
       return;
     }
 
-    // Priority: welcome events first
-    const welcomeEvents = events.filter((e) => e.template === 'welcome');
-    const displayEvents = welcomeEvents.length > 0 ? welcomeEvents : events;
+    // Priority: welcome + interview events first
+    const priorityEvents = events.filter(
+      (e) => e.template === 'welcome' || e.template === 'interview'
+    );
+    const displayEvents = priorityEvents.length > 0 ? priorityEvents : events;
 
     rollingRef.current = { events: displayEvents, index: 0 };
     setCurrentEvent(displayEvents[0]);
@@ -76,6 +79,7 @@ export default function DisplayApp({ floor }: { floor: string }) {
       <BirthdayScreen active={currentScreen === 'birthday'} title={title} subtitle={subtitle} />
       <NoticeScreen active={currentScreen === 'notice'} title={title} subtitle={subtitle} />
       <CelebrationScreen active={currentScreen === 'celebration'} title={title} subtitle={subtitle} />
+      <InterviewScreen active={currentScreen === 'interview'} title={title} subtitle={subtitle} />
       <DefaultScreen active={currentScreen === 'default'} title={title} subtitle={subtitle} />
 
       <div className={`connection-status ${status}`}>

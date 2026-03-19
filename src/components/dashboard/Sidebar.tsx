@@ -6,9 +6,6 @@ import { signOut } from 'next-auth/react';
 const NAV = [
   { href: '/dashboard', label: '현황', icon: '📊' },
   { href: '/dashboard/events', label: '이벤트 관리', icon: '📅' },
-  { href: '/dashboard/notices', label: '긴급 공지', icon: '🔔' },
-  { href: '/dashboard/devices', label: '디바이스', icon: '🖥️' },
-  { href: '/dashboard/preview', label: '미리보기', icon: '👁️' },
 ];
 
 export default function Sidebar({ user }: { user: any }) {

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getActiveEvents, getFloorCalendarId } from '@/lib/google-calendar';
-import { getSupabaseClient } from '@/lib/supabase-server';
-import { mergeEvents } from '@/lib/event-utils';
-import { DisplayEvent, QuickNotice } from '@/types';
+import { DisplayEvent } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,25 +18,11 @@ export async function GET(
     let calendarEvents: DisplayEvent[] = [];
     try { calendarEvents = await getActiveEvents(calendarId); } catch {}
 
-    let notices: QuickNotice[] = [];
-    try {
-      const supabase = getSupabaseClient();
-      const { data } = await supabase
-        .from('quick_notices')
-        .select('*')
-        .eq('floor', floor)
-        .eq('is_active', true)
-        .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
-      notices = (data || []) as QuickNotice[];
-    } catch {}
-
-    const events = mergeEvents(calendarEvents, notices);
-
     return NextResponse.json({
       floor,
-      hasEvents: events.length > 0,
-      eventCount: events.length,
-      events: events.map((e) => ({ title: e.title, template: e.template })),
+      hasEvents: calendarEvents.length > 0,
+      eventCount: calendarEvents.length,
+      events: calendarEvents.map((e) => ({ title: e.title, template: e.template })),
     });
   } catch {
     return NextResponse.json({ floor, hasEvents: false, eventCount: 0, events: [] });

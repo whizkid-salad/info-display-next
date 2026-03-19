@@ -1,6 +1,6 @@
 import { google, calendar_v3 } from 'googleapis';
 import { DisplayEvent, CalendarEventInput } from '@/types';
-import { parseDescription, templateToTag } from './event-utils';
+import { parseDescription } from './event-utils';
 
 let calendarClient: calendar_v3.Calendar | null = null;
 
@@ -19,6 +19,8 @@ function getCalendarClient(): calendar_v3.Calendar {
   calendarClient = google.calendar({ version: 'v3', auth });
   return calendarClient;
 }
+
+const ALL_FLOORS = ['6', '8'];
 
 export function getFloorCalendarId(floor: string): string {
   const map: Record<string, string | undefined> = {
@@ -72,27 +74,91 @@ export async function listEventsForRange(
   timeMax: string
 ): Promise<DisplayEvent[]> {
   const calendar = getCalendarClient();
-  const res = await calendar.events.list({
-    calendarId,
-    timeMin,
-    timeMax,
-    singleEvents: true,
-    orderBy: 'startTime',
-    maxResults: 50,
-  });
+  const allEvents: DisplayEvent[] = [];
+  let pageToken: string | undefined;
 
-  return (res.data.items || []).map((event) => {
-    const { template, subtitle } = parseDescription(event.description);
-    return {
-      id: event.id || '',
-      title: event.summary || '',
-      template,
-      subtitle,
-      start: event.start?.dateTime || event.start?.date || '',
-      end: event.end?.dateTime || event.end?.date || '',
-      source: 'calendar' as const,
-    };
-  });
+  do {
+    const res = await calendar.events.list({
+      calendarId,
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 250,
+      pageToken,
+    });
+
+    const events = (res.data.items || []).map((event) => {
+      const { template, subtitle } = parseDescription(event.description);
+      return {
+        id: event.id || '',
+        title: event.summary || '',
+        template,
+        subtitle,
+        start: event.start?.dateTime || event.start?.date || '',
+        end: event.end?.dateTime || event.end?.date || '',
+        source: 'calendar' as const,
+      };
+    });
+
+    allEvents.push(...events);
+    pageToken = res.data.nextPageToken || undefined;
+  } while (pageToken);
+
+  return allEvents;
+}
+
+/** 모든 층 캘린더에서 이벤트를 가져와 중복 제거 후 통합 목록 반환 */
+export async function listAllFloorsEvents(
+  timeMin: string,
+  timeMax: string
+): Promise<DisplayEvent[]> {
+  // 각 층별로 병렬 조회
+  const floorResults = await Promise.all(
+    ALL_FLOORS.map(async (floor) => {
+      try {
+        const calendarId = getFloorCalendarId(floor);
+        const events = await listEventsForRange(calendarId, timeMin, timeMax);
+        return events.map((e) => ({ ...e, _floor: floor, _originalId: e.id }));
+      } catch {
+        return [];
+      }
+    })
+  );
+
+  // 중복 제거: title + start + end 기준으로 그룹핑
+  const groupMap = new Map<string, DisplayEvent & { floors: string[]; eventIds: Record<string, string> }>();
+
+  for (let fi = 0; fi < ALL_FLOORS.length; fi++) {
+    const floor = ALL_FLOORS[fi];
+    for (const event of floorResults[fi]) {
+      const key = `${event.title}|${event.start}|${event.end}`;
+      const existing = groupMap.get(key);
+      if (existing) {
+        if (!existing.floors.includes(floor)) {
+          existing.floors.push(floor);
+        }
+        existing.eventIds[floor] = event._originalId;
+      } else {
+        groupMap.set(key, {
+          id: event._originalId,
+          title: event.title,
+          template: event.template,
+          subtitle: event.subtitle,
+          start: event.start,
+          end: event.end,
+          source: 'calendar',
+          floors: [floor],
+          eventIds: { [floor]: event._originalId },
+        });
+      }
+    }
+  }
+
+  // 시작시간 순 정렬
+  return Array.from(groupMap.values()).sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+  );
 }
 
 export async function createCalendarEvent(

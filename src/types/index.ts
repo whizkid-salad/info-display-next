@@ -1,24 +1,13 @@
 export interface DisplayEvent {
   id: string;
   title: string;
-  template: 'welcome' | 'birthday' | 'notice' | 'celebration' | 'default';
+  template: 'welcome' | 'birthday' | 'notice' | 'celebration' | 'interview' | 'default';
   subtitle: string;
   start: string;
   end: string;
-  source: 'calendar' | 'supabase';
-}
-
-export interface QuickNotice {
-  id: string;
-  floor: string;
-  title: string;
-  subtitle: string;
-  template: string;
-  priority: number;
-  is_active: boolean;
-  created_by: string | null;
-  created_at: string;
-  expires_at: string | null;
+  source: 'calendar';
+  floors?: string[];
+  eventIds?: Record<string, string>;
 }
 
 export interface DeviceHeartbeat {

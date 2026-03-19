@@ -260,6 +260,40 @@ html, body {
   text-shadow: 0 2px 20px rgba(0,0,0,0.3);
 }
 
+/* ===== 면접 템플릿 ===== */
+#interview-screen {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+  color: #fff;
+}
+
+.interview-content {
+  text-align: center;
+  padding: 3rem;
+}
+
+.interview-icon {
+  font-size: 5rem;
+  margin-bottom: 1rem;
+}
+
+.interview-label {
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
+
+#interview-screen .event-title {
+  font-size: 5rem;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+}
+
+#interview-screen .event-subtitle {
+  font-size: 2.2rem;
+  margin-top: 1.5rem;
+}
+
 /* ===== 기본 안내 템플릿 ===== */
 #default-screen {
   background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);

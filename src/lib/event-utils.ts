@@ -1,4 +1,4 @@
-import { DisplayEvent, QuickNotice } from '@/types';
+import { DisplayEvent } from '@/types';
 
 export function stripHtml(html: string): string {
   return html
@@ -16,6 +16,7 @@ const TAG_MAP: Record<string, DisplayEvent['template']> = {
   '#생일': 'birthday',
   '#공지': 'notice',
   '#축하': 'celebration',
+  '#면접': 'interview',
 };
 
 export function parseDescription(description: string | null | undefined): {
@@ -55,30 +56,7 @@ export function templateToTag(template: string): string {
     birthday: '#생일',
     notice: '#공지',
     celebration: '#축하',
+    interview: '#면접',
   };
   return reverseMap[template] || '';
-}
-
-export function mergeEvents(
-  calendarEvents: DisplayEvent[],
-  notices: QuickNotice[]
-): DisplayEvent[] {
-  // Convert supabase notices to DisplayEvent format
-  const noticeEvents: DisplayEvent[] = notices
-    .filter((n) => n.is_active && (!n.expires_at || new Date(n.expires_at) > new Date()))
-    .map((n) => ({
-      id: n.id,
-      title: n.title,
-      template: n.template as DisplayEvent['template'],
-      subtitle: n.subtitle || '',
-      start: n.created_at,
-      end: n.expires_at || new Date(Date.now() + 86400000).toISOString(),
-      source: 'supabase' as const,
-    }));
-
-  // Emergency notices (priority >= 100) come first
-  const emergency = noticeEvents.filter((_, i) => notices[i]?.priority >= 100);
-  const normal = noticeEvents.filter((_, i) => (notices[i]?.priority ?? 0) < 100);
-
-  return [...emergency, ...calendarEvents, ...normal];
 }
