@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/metrics/sync
- * 마지막 동기화 상태 확인 (간단 health check)
+ * 마지막 동기화 상태 + 스프레드시트 테스트 읽기
  */
 export async function GET() {
   try {
@@ -102,7 +102,17 @@ export async function GET() {
     if (error) throw error;
 
     const lastSynced = data?.[0]?.recorded_at || null;
-    return NextResponse.json({ ok: true, lastSynced });
+
+    // 스프레드시트 테스트 읽기 (최근 1행)
+    let sheetTest: any = null;
+    try {
+      const rows = await fetchMetricsFromSheets(1);
+      sheetTest = { rowCount: rows.length, sample: rows.slice(0, 4) };
+    } catch (sheetErr: any) {
+      sheetTest = { error: sheetErr.message };
+    }
+
+    return NextResponse.json({ ok: true, lastSynced, sheetTest });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
