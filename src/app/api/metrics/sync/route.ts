@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       granularity: 'daily',
       value: row.value,
       // 날짜 → 해당일 06:00 KST (데이터 기입 시점) = 전날 21:00 UTC
-      recorded_at: `${row.date}T06:00:00+09:00`,
+      recorded_at: `${row.date}T12:00:00Z`,
     }));
 
     // 3) 배치 upsert (500개씩)

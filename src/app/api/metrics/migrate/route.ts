@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const supabase = getSupabaseClient();
 
     // 기존 데이터 전체 삭제 (seed 더미 포함)
-    await supabase.from('metrics').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('metrics').delete().gte('recorded_at', '2000-01-01T00:00:00Z');
 
     // days=0 → 전체 행 가져오기
     const sheetRows = await fetchMetricsFromSheets(0);
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       metric: row.metric,
       granularity: 'daily',
       value: row.value,
-      recorded_at: `${row.date}T06:00:00+09:00`,
+      recorded_at: `${row.date}T12:00:00Z`,
     }));
 
     // 배치 upsert (500개씩)
