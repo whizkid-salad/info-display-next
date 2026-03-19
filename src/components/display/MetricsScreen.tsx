@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Cell, Legend,
 } from 'recharts';
 
-const ROLLING_INTERVAL = 10000;
+const ROLLING_INTERVAL = 15000;
 
 const PRODUCT_COLORS: Record<string, string> = {
   review: '#3b82f6',   // 파랑
