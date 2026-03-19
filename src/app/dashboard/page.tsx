@@ -287,10 +287,18 @@ export default function DashboardPage() {
     e.preventDefault(); setSaving(true); setError('');
     try {
       if (editingEvent) {
-        const res = await fetch(`/api/calendar/${editingEvent.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: editingEvent.eventIds, title: form.title, template: form.template, subtitle: form.subtitle, start: form.start, end: form.end }) });
-        if (!res.ok) { const d = await res.json(); throw new Error(d.error || '수정 실패'); }
+        if (editingEvent.source === 'calendar') {
+          // 캘린더 이벤트 수정 (기존 로직)
+          const res = await fetch(`/api/calendar/${editingEvent.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: editingEvent.eventIds, title: form.title, template: form.template, subtitle: form.subtitle, start: form.start, end: form.end }) });
+          if (!res.ok) { const d = await res.json(); throw new Error(d.error || '수정 실패'); }
+        } else {
+          // 대시보드 이벤트 수정 (Supabase)
+          const res = await fetch(`/api/dashboard-events/${editingEvent.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: form.title, template: form.template, subtitle: form.subtitle, start: form.start, end: form.end, floors: form.floors }) });
+          if (!res.ok) { const d = await res.json(); throw new Error(d.error || '수정 실패'); }
+        }
       } else {
-        const res = await fetch('/api/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ floors: form.floors, title: form.title, template: form.template, subtitle: form.subtitle, start: form.start, end: form.end }) });
+        // 새 이벤트 → Supabase에 저장
+        const res = await fetch('/api/dashboard-events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: form.title, template: form.template, subtitle: form.subtitle, start: form.start, end: form.end, floors: form.floors }) });
         if (!res.ok) { const d = await res.json(); throw new Error(d.error || '등록 실패'); }
       }
       setModalOpen(false); loadEvents();
@@ -300,8 +308,14 @@ export default function DashboardPage() {
 
   const handleDelete = async (event: DisplayEvent) => {
     if (!confirm('이벤트를 삭제하시겠습니까?')) return;
-    if (event.eventIds) { await fetch('/api/calendar', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: event.eventIds }) }); }
-    else { const floor = event.floors?.[0] || '6'; await fetch(`/api/calendar/${event.id}?floor=${floor}`, { method: 'DELETE' }); }
+    if (event.source === 'calendar') {
+      // 캘린더 이벤트 삭제
+      if (event.eventIds) { await fetch('/api/calendar', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: event.eventIds }) }); }
+      else { const floor = event.floors?.[0] || '6'; await fetch(`/api/calendar/${event.id}?floor=${floor}`, { method: 'DELETE' }); }
+    } else {
+      // 대시보드 이벤트 삭제 (Supabase)
+      await fetch('/api/dashboard-events', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: event.id }) });
+    }
     loadEvents();
   };
 
@@ -387,10 +401,14 @@ export default function DashboardPage() {
             ) : pagedEvents.map((e, idx) => (
               <tr key={`${e.id}-${idx}`} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zM12 17.25a5.25 5.25 0 110-10.5 5.25 5.25 0 010 10.5z"/></svg>
-                    캘린더
-                  </span>
+                  {e.source === 'calendar' ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zM12 17.25a5.25 5.25 0 110-10.5 5.25 5.25 0 010 10.5z"/></svg>
+                      캘린더
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">📋 대시보드</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-sm">{getTemplateLabel(e.template)}</td>
                 <td className="px-4 py-3 text-sm">
@@ -437,7 +455,11 @@ export default function DashboardPage() {
           <div key={`${e.id}-${idx}`} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">캘린더</span>
+                {e.source === 'calendar' ? (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">캘린더</span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">대시보드</span>
+                )}
                 <span className="text-sm">{getTemplateLabel(e.template)}</span>
                 {(e.floors || []).map((f) => (
                   <span key={f} className={`px-1.5 py-0.5 rounded text-xs font-medium ${f === '6' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{f}F</span>

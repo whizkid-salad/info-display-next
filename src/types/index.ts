@@ -5,7 +5,7 @@ export interface DisplayEvent {
   subtitle: string;
   start: string;
   end: string;
-  source: 'calendar';
+  source: 'calendar' | 'dashboard';
   floors?: string[];
   eventIds?: Record<string, string>;
 }
