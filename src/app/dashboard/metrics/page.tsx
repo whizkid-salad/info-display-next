@@ -168,7 +168,7 @@ export default function MetricsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-8">
         {/* ── 카드 1: 데이터 동기화 ── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
           <h4 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-2">🔄 데이터 동기화</h4>
@@ -297,6 +297,106 @@ export default function MetricsPage() {
             className="w-full bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm hover:bg-indigo-700 flex items-center justify-center gap-2">
             📋 데이터 보기
           </button>
+        </div>
+
+        {/* ── 카드 4: 차트 롤링 설정 ── */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <h4 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-2">🔄 차트 롤링 설정</h4>
+          <p className="text-xs text-gray-500 mb-3">디스플레이에서 자동 순환할 화면과 순서를 설정합니다.</p>
+          {metricsConfig && (
+            <div className="space-y-3">
+              {/* 롤링 뷰 목록 (드래그 순서 변경) */}
+              <div className="space-y-2">
+                {(metricsConfig.rolling?.views || ['daily', 'weekly', 'counter']).map((view: string, idx: number) => {
+                  const viewInfo: Record<string, { icon: string; label: string }> = {
+                    daily: { icon: '📈', label: '일간 차트 (14일)' },
+                    weekly: { icon: '📊', label: '주간 차트 (12주 합산)' },
+                    counter: { icon: '🔢', label: '라이브 카운터' },
+                  };
+                  const info = viewInfo[view] || { icon: '❓', label: view };
+                  const allViews = metricsConfig.rolling?.views || ['daily', 'weekly', 'counter'];
+
+                  return (
+                    <div key={view} className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50">
+                      {/* 순서 변경 버튼 */}
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => {
+                            if (idx === 0) return;
+                            const updated = [...allViews];
+                            [updated[idx - 1], updated[idx]] = [updated[idx], updated[idx - 1]];
+                            setMetricsConfig({ ...metricsConfig, rolling: { ...metricsConfig.rolling, views: updated, interval: metricsConfig.rolling?.interval || 15 } });
+                          }}
+                          disabled={idx === 0}
+                          className="text-[10px] text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none">▲</button>
+                        <button
+                          onClick={() => {
+                            if (idx === allViews.length - 1) return;
+                            const updated = [...allViews];
+                            [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+                            setMetricsConfig({ ...metricsConfig, rolling: { ...metricsConfig.rolling, views: updated, interval: metricsConfig.rolling?.interval || 15 } });
+                          }}
+                          disabled={idx === allViews.length - 1}
+                          className="text-[10px] text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none">▼</button>
+                      </div>
+                      <span className="text-sm">{info.icon}</span>
+                      <span className="text-sm text-gray-700 flex-1">{info.label}</span>
+                      {/* 제거 버튼 */}
+                      <button
+                        onClick={() => {
+                          const updated = allViews.filter((_: string, i: number) => i !== idx);
+                          if (updated.length === 0) return; // 최소 1개
+                          setMetricsConfig({ ...metricsConfig, rolling: { ...metricsConfig.rolling, views: updated, interval: metricsConfig.rolling?.interval || 15 } });
+                        }}
+                        className="text-xs text-red-400 hover:text-red-600">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 비활성화된 뷰 추가 버튼 */}
+              {(() => {
+                const allPossible = ['daily', 'weekly', 'counter'];
+                const current = metricsConfig.rolling?.views || ['daily', 'weekly', 'counter'];
+                const missing = allPossible.filter((v) => !current.includes(v));
+                const viewLabels: Record<string, string> = { daily: '📈 일간', weekly: '📊 주간', counter: '🔢 카운터' };
+                if (missing.length === 0) return null;
+                return (
+                  <div className="flex gap-2 flex-wrap">
+                    {missing.map((v) => (
+                      <button key={v}
+                        onClick={() => {
+                          setMetricsConfig({ ...metricsConfig, rolling: { ...metricsConfig.rolling, views: [...current, v], interval: metricsConfig.rolling?.interval || 15 } });
+                        }}
+                        className="text-xs px-2.5 py-1.5 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-600">
+                        + {viewLabels[v]}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* 전환 간격 */}
+              <div className="flex items-center gap-3 pt-2 border-t border-gray-100">
+                <label className="text-xs text-gray-500 whitespace-nowrap">전환 간격</label>
+                <select
+                  value={metricsConfig.rolling?.interval || 15}
+                  onChange={(e) => setMetricsConfig({ ...metricsConfig, rolling: { ...metricsConfig.rolling, views: metricsConfig.rolling?.views || ['daily', 'weekly', 'counter'], interval: Number(e.target.value) } })}
+                  className="flex-1 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs">
+                  <option value={10}>10초</option>
+                  <option value={15}>15초</option>
+                  <option value={20}>20초</option>
+                  <option value={30}>30초</option>
+                  <option value={60}>60초</option>
+                </select>
+              </div>
+
+              <button onClick={handleConfigSave} disabled={configSaving}
+                className="w-full bg-blue-600 text-white px-3 py-2 rounded-lg text-xs hover:bg-blue-700 disabled:opacity-50">
+                {configSaving ? '저장 중...' : '롤링 설정 저장'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

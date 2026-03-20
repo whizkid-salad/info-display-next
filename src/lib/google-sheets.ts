@@ -57,10 +57,16 @@ export const THEME_PRESETS: Record<string, ChartTheme> = {
   },
 };
 
+export interface RollingConfig {
+  views: string[];       // ['daily', 'weekly', 'counter'] 순서대로
+  interval: number;      // 초 단위 (기본 15)
+}
+
 export interface MetricsSheetConfig {
   spreadsheetId: string;
   sheets: SheetConfig[];
   theme?: ChartTheme;
+  rolling?: RollingConfig;
 }
 
 const DEFAULT_CONFIG: MetricsSheetConfig = {
@@ -100,6 +106,7 @@ export async function getMetricsConfig(): Promise<MetricsSheetConfig> {
         spreadsheetId: data.spreadsheet_id,
         sheets: data.sheets as SheetConfig[],
         theme: (data.theme as ChartTheme) || THEME_PRESETS.default,
+        rolling: (data.rolling as RollingConfig) || { views: ['daily', 'weekly', 'counter'], interval: 15 },
       };
     }
   } catch {
@@ -116,6 +123,7 @@ export async function saveMetricsConfig(config: MetricsSheetConfig): Promise<voi
     spreadsheet_id: config.spreadsheetId,
     sheets: config.sheets,
     theme: config.theme || THEME_PRESETS.default,
+    rolling: config.rolling || { views: ['daily', 'weekly', 'counter'], interval: 15 },
     updated_at: new Date().toISOString(),
   });
 }

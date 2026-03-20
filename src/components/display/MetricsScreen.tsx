@@ -140,16 +140,25 @@ function transformWeeklyData(rawData: any[]) {
     });
 }
 
-/** 카운터용: 최신 날짜의 review+upsell+push live_count 합산 */
-function getLiveTotal(rawData: any[]): number {
-  if (!rawData || rawData.length === 0) return 0;
-  // 가장 최신 데이터 행
-  const latest = rawData[rawData.length - 1];
+/** 카운터용: 특정 인덱스의 review+upsell+push live_count 합산 */
+function getLiveTotalAt(rawData: any[], index: number): number {
+  if (!rawData || rawData.length === 0 || index < 0 || index >= rawData.length) return 0;
+  const row = rawData[index];
   let total = 0;
   for (const p of ['review', 'upsell', 'push']) {
-    total += Number(latest[`${p}_live_count`]) || 0;
+    total += Number(row[`${p}_live_count`]) || 0;
   }
   return total;
+}
+
+/** 카운터용: 7일전 합산과 최신 합산 반환 */
+function getLiveTotals(rawData: any[]): { start: number; end: number } {
+  if (!rawData || rawData.length === 0) return { start: 0, end: 0 };
+  const end = getLiveTotalAt(rawData, rawData.length - 1);
+  // 7일전 데이터 (일별 데이터이므로 인덱스 -7)
+  const startIdx = Math.max(0, rawData.length - 7);
+  const start = getLiveTotalAt(rawData, startIdx);
+  return { start, end };
 }
 
 function CustomXTick({ x, y, payload, isLast, textColor }: any) {
@@ -226,19 +235,30 @@ export default function MetricsScreen({ active, metricsMode = 'auto' }: Props) {
     colors: DEFAULT_COLORS, gridColor: DEFAULT_GRID, textColor: DEFAULT_TEXT,
   });
 
+  // 롤링 설정 (config에서 로드)
+  const [rollingViews, setRollingViews] = useState<SubView[]>(['daily', 'weekly', 'counter']);
+  const [rollingInterval, setRollingInterval] = useState(15);
+
   useEffect(() => {
-    async function loadTheme() {
+    async function loadConfig() {
       try {
         const res = await fetch('/api/metrics/config');
         const data = await res.json();
-        if (data.ok && data.config?.theme) {
-          const t = data.config.theme;
-          setTheme({ colors: t.colors || DEFAULT_COLORS, gridColor: t.gridColor || DEFAULT_GRID, textColor: t.textColor || DEFAULT_TEXT });
+        if (data.ok && data.config) {
+          if (data.config.theme) {
+            const t = data.config.theme;
+            setTheme({ colors: t.colors || DEFAULT_COLORS, gridColor: t.gridColor || DEFAULT_GRID, textColor: t.textColor || DEFAULT_TEXT });
+          }
+          if (data.config.rolling) {
+            const validViews = (data.config.rolling.views || []).filter((v: string) => SUB_VIEWS.includes(v as SubView)) as SubView[];
+            if (validViews.length > 0) setRollingViews(validViews);
+            if (data.config.rolling.interval) setRollingInterval(data.config.rolling.interval);
+          }
         }
       } catch { /* 폴백 사용 */ }
     }
-    loadTheme();
-    const t = setInterval(loadTheme, 300000);
+    loadConfig();
+    const t = setInterval(loadConfig, 300000);
     return () => clearInterval(t);
   }, []);
 
@@ -249,26 +269,29 @@ export default function MetricsScreen({ active, metricsMode = 'auto' }: Props) {
     }
   }, [metricsMode]);
 
-  // auto 모드: 15초마다 sub-view 순환
+  // auto 모드: rollingInterval 간격으로 rollingViews 순환
   useEffect(() => {
-    if (!active || metricsMode !== 'auto') return;
+    if (!active || metricsMode !== 'auto' || rollingViews.length === 0) return;
+    // 첫 번째 view로 시작
+    setCurrentView(rollingViews[0]);
     const timer = setInterval(() => {
       setCurrentView((prev) => {
-        const idx = SUB_VIEWS.indexOf(prev);
-        return SUB_VIEWS[(idx + 1) % SUB_VIEWS.length];
+        const idx = rollingViews.indexOf(prev);
+        const nextIdx = (idx + 1) % rollingViews.length;
+        return rollingViews[nextIdx];
       });
       setAnimKey((k) => k + 1);
-    }, 15000);
+    }, rollingInterval * 1000);
     return () => clearInterval(timer);
-  }, [active, metricsMode]);
+  }, [active, metricsMode, rollingViews, rollingInterval]);
 
-  // 고정 모드일 때도 15초마다 차트 애니메이션 리프레시
+  // 고정 모드일 때도 주기적 차트 애니메이션 리프레시
   useEffect(() => {
     if (!active || metricsMode === 'auto') return;
     if (currentView === 'counter') return; // 카운터는 자체 애니메이션
-    const timer = setInterval(() => setAnimKey((k) => k + 1), 15000);
+    const timer = setInterval(() => setAnimKey((k) => k + 1), rollingInterval * 1000);
     return () => clearInterval(timer);
-  }, [active, metricsMode, currentView]);
+  }, [active, metricsMode, currentView, rollingInterval]);
 
   const dailyChartData = useMemo(() => {
     if (!daily?.data) return [];
@@ -280,9 +303,9 @@ export default function MetricsScreen({ active, metricsMode = 'auto' }: Props) {
     return transformWeeklyData(weekly.data);
   }, [weekly]);
 
-  const liveTotal = useMemo(() => {
-    if (!daily?.data) return 0;
-    return getLiveTotal(daily.data);
+  const liveTotals = useMemo(() => {
+    if (!daily?.data) return { start: 0, end: 0 };
+    return getLiveTotals(daily.data);
   }, [daily]);
 
   const renderContent = () => {
@@ -292,7 +315,7 @@ export default function MetricsScreen({ active, metricsMode = 'auto' }: Props) {
       case 'weekly':
         return <MetricsChart data={weeklyChartData} animKey={animKey} theme={theme} />;
       case 'counter':
-        return <FlipClockCounter value={liveTotal} />;
+        return <FlipClockCounter startValue={liveTotals.start} endValue={liveTotals.end} />;
     }
   };
 

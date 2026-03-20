@@ -26,13 +26,13 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { spreadsheetId, sheets, theme } = body;
+    const { spreadsheetId, sheets, theme, rolling } = body;
 
     if (!spreadsheetId || !sheets || !Array.isArray(sheets)) {
       return NextResponse.json({ error: 'Invalid config format' }, { status: 400 });
     }
 
-    await saveMetricsConfig({ spreadsheetId, sheets, theme });
+    await saveMetricsConfig({ spreadsheetId, sheets, theme, rolling });
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
