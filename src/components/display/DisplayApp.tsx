@@ -13,7 +13,7 @@ import DefaultScreen from './DefaultScreen';
 
 const ROLLING_INTERVAL = 7000;
 
-export default function DisplayApp({ floor, idleMode = 'metrics' }: { floor: string; idleMode?: string }) {
+export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 'auto' }: { floor: string; idleMode?: string; metricsMode?: string }) {
   const { events, status } = useEventPolling(floor);
   const [currentEvent, setCurrentEvent] = useState<DisplayEvent | null>(null);
   const [currentScreen, setCurrentScreen] = useState<string>('idle');
@@ -72,9 +72,9 @@ export default function DisplayApp({ floor, idleMode = 'metrics' }: { floor: str
 
   return (
     <div id="app" onClick={handleClick}>
-      {/* 유휴 시: clock 또는 metrics */}
+      {/* 유휴 시: clock 또는 metrics (auto/daily/weekly/counter) */}
       {idleMode === 'metrics' ? (
-        <MetricsScreen active={isIdle} />
+        <MetricsScreen active={isIdle} metricsMode={metricsMode as any} />
       ) : (
         <IdleScreen active={isIdle} />
       )}

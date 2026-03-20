@@ -150,7 +150,10 @@ export default function DashboardPage() {
                   <h3 className="text-base md:text-lg font-bold text-gray-800">{floor}층</h3>
                   <select value={idleModes[floor] || 'metrics'} onChange={(e) => setIdleModes((prev) => ({ ...prev, [floor]: e.target.value }))}
                     className="text-xs border border-gray-300 rounded-md px-1.5 py-0.5 bg-white text-gray-600">
-                    <option value="metrics">📊 지표</option>
+                    <option value="metrics">📊 지표(자동)</option>
+                    <option value="metrics-daily">📈 일간 차트</option>
+                    <option value="metrics-weekly">📊 주간 차트</option>
+                    <option value="metrics-counter">🔢 카운터</option>
                     <option value="clock">🕐 시계</option>
                   </select>
                 </div>

@@ -1,10 +1,11 @@
 'use client';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useMetricsPolling } from '@/hooks/useMetricsPolling';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, Legend,
 } from 'recharts';
+import FlipClockCounter from './FlipClockCounter';
 
 const DEFAULT_COLORS: Record<string, string> = {
   review: '#3b82f6', upsell: '#22c55e', push: '#f97316', imweb: '#a855f7',
@@ -16,34 +17,108 @@ const PRODUCT_LABELS: Record<string, string> = {
   review: '리뷰', upsell: '업셀', push: '푸시', imweb: '깍두기',
 };
 const PRODUCTS = ['review', 'upsell', 'push', 'imweb'];
+const SUB_VIEWS = ['daily', 'weekly', 'counter'] as const;
+type SubView = typeof SUB_VIEWS[number];
 
-interface Props { active: boolean; }
+interface Props { active: boolean; metricsMode?: 'auto' | SubView; }
 interface ThemeConfig { colors: Record<string, string>; gridColor: string; textColor: string; }
 
-function formatTimeLabel(time: string): string {
+function formatDailyLabel(time: string): string {
   const d = new Date(time);
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   return `${d.getMonth() + 1}/${d.getDate()}(${days[d.getDay()]})`;
 }
 
-/** 주간 뷰: 날짜별 데이터 변환 */
-function transformWeeklyData(rawData: any[]) {
+/** ISO 주차 번호 계산 */
+function getISOWeekKey(date: Date): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const yearStart = new Date(d.getFullYear(), 0, 4);
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + yearStart.getDay() + 1) / 7);
+  return `${d.getFullYear()}-W${weekNo}`;
+}
+
+/** 주간 시작일(월요일) 계산 */
+function getWeekMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** 일간 뷰: 14일 데이터 변환 */
+function transformDailyData(rawData: any[]) {
   const bucketMap = new Map<string, any>();
 
   for (const row of rawData) {
-    const label = formatTimeLabel(row.time);
+    const label = formatDailyLabel(row.time);
     if (!bucketMap.has(label)) {
       bucketMap.set(label, { label, _time: row.time, onboarding: 0 });
       for (const p of PRODUCTS) {
         bucketMap.get(label)![`${p}_live`] = 0;
-        bucketMap.get(label)![`${p}_start`] = 0;
-        bucketMap.get(label)![`${p}_stop`] = 0;
+        bucketMap.get(label)![`${p}_net`] = 0;
       }
     }
     const bucket = bucketMap.get(label)!;
     for (const p of PRODUCTS) {
       if (row[`${p}_live_count`] !== undefined)
         bucket[`${p}_live`] = Number(row[`${p}_live_count`]) || bucket[`${p}_live`];
+      const start = Number(row[`${p}_service_start`]) || 0;
+      const stop = Number(row[`${p}_service_stop`]) || 0;
+      bucket[`${p}_net`] += start - stop;
+      if (row[`${p}_onboarding`] !== undefined)
+        bucket.onboarding += Number(row[`${p}_onboarding`]) || 0;
+    }
+  }
+
+  return Array.from(bucketMap.values());
+}
+
+/** 주간 뷰: ISO 주차 기준 합산 (12주) */
+function transformWeeklyData(rawData: any[]) {
+  const bucketMap = new Map<string, any>();
+
+  for (const row of rawData) {
+    const date = new Date(row.time);
+    const weekKey = getISOWeekKey(date);
+
+    if (!bucketMap.has(weekKey)) {
+      const monday = getWeekMonday(date);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      const label = `${monday.getMonth() + 1}/${monday.getDate()}~${sunday.getMonth() + 1}/${sunday.getDate()}`;
+
+      bucketMap.set(weekKey, {
+        label,
+        _weekKey: weekKey,
+        _time: row.time,
+        onboarding: 0,
+      });
+      for (const p of PRODUCTS) {
+        bucketMap.get(weekKey)![`${p}_live`] = 0;
+        bucketMap.get(weekKey)![`${p}_start`] = 0;
+        bucketMap.get(weekKey)![`${p}_stop`] = 0;
+      }
+    }
+
+    const bucket = bucketMap.get(weekKey)!;
+    // 주간 내 가장 최신 time 추적 (라이브는 마지막 값 사용)
+    if (new Date(row.time) > new Date(bucket._time)) {
+      bucket._time = row.time;
+    }
+
+    for (const p of PRODUCTS) {
+      // 라이브 카운트: 주간 내 최신 값으로 덮어쓰기 (누적이므로)
+      if (row[`${p}_live_count`] !== undefined) {
+        const val = Number(row[`${p}_live_count`]) || 0;
+        if (new Date(row.time).getTime() >= new Date(bucket._time).getTime()) {
+          bucket[`${p}_live`] = val;
+        }
+      }
+      // 서비스 시작/중단: 주간 합산
       if (row[`${p}_service_start`] !== undefined)
         bucket[`${p}_start`] += Number(row[`${p}_service_start`]) || 0;
       if (row[`${p}_service_stop`] !== undefined)
@@ -53,14 +128,28 @@ function transformWeeklyData(rawData: any[]) {
     }
   }
 
-  return Array.from(bucketMap.values()).map((b) => {
-    const entry: any = { label: b.label, _time: b._time, onboarding: b.onboarding };
-    for (const p of PRODUCTS) {
-      entry[`${p}_live`] = b[`${p}_live`];
-      entry[`${p}_net`] = b[`${p}_start`] - b[`${p}_stop`];
-    }
-    return entry;
-  });
+  return Array.from(bucketMap.values())
+    .sort((a, b) => a._weekKey.localeCompare(b._weekKey))
+    .map((b) => {
+      const entry: any = { label: b.label, _time: b._time, onboarding: b.onboarding };
+      for (const p of PRODUCTS) {
+        entry[`${p}_live`] = b[`${p}_live`];
+        entry[`${p}_net`] = b[`${p}_start`] - b[`${p}_stop`];
+      }
+      return entry;
+    });
+}
+
+/** 카운터용: 최신 날짜의 review+upsell+push live_count 합산 */
+function getLiveTotal(rawData: any[]): number {
+  if (!rawData || rawData.length === 0) return 0;
+  // 가장 최신 데이터 행
+  const latest = rawData[rawData.length - 1];
+  let total = 0;
+  for (const p of ['review', 'upsell', 'push']) {
+    total += Number(latest[`${p}_live_count`]) || 0;
+  }
+  return total;
 }
 
 function CustomXTick({ x, y, payload, isLast, textColor }: any) {
@@ -122,9 +211,16 @@ function MetricsChart({ data, animKey, theme }: { data: any[]; animKey: number; 
   );
 }
 
-export default function MetricsScreen({ active }: Props) {
-  const { weekly } = useMetricsPolling(300000);
+const VIEW_BADGES: Record<SubView, string> = {
+  daily: '📈 일간',
+  weekly: '📊 주간',
+  counter: '🔢 카운터',
+};
+
+export default function MetricsScreen({ active, metricsMode = 'auto' }: Props) {
+  const { daily, weekly } = useMetricsPolling(300000);
   const [animKey, setAnimKey] = useState(0);
+  const [currentView, setCurrentView] = useState<SubView>('daily');
 
   const [theme, setTheme] = useState<ThemeConfig>({
     colors: DEFAULT_COLORS, gridColor: DEFAULT_GRID, textColor: DEFAULT_TEXT,
@@ -146,28 +242,69 @@ export default function MetricsScreen({ active }: Props) {
     return () => clearInterval(t);
   }, []);
 
-  // 주간 뷰만 표시 (일간 뷰는 추후 활성화)
-  const chartData = useMemo(() => {
+  // 고정 모드이면 해당 view로 설정
+  useEffect(() => {
+    if (metricsMode !== 'auto') {
+      setCurrentView(metricsMode);
+    }
+  }, [metricsMode]);
+
+  // auto 모드: 15초마다 sub-view 순환
+  useEffect(() => {
+    if (!active || metricsMode !== 'auto') return;
+    const timer = setInterval(() => {
+      setCurrentView((prev) => {
+        const idx = SUB_VIEWS.indexOf(prev);
+        return SUB_VIEWS[(idx + 1) % SUB_VIEWS.length];
+      });
+      setAnimKey((k) => k + 1);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [active, metricsMode]);
+
+  // 고정 모드일 때도 15초마다 차트 애니메이션 리프레시
+  useEffect(() => {
+    if (!active || metricsMode === 'auto') return;
+    if (currentView === 'counter') return; // 카운터는 자체 애니메이션
+    const timer = setInterval(() => setAnimKey((k) => k + 1), 15000);
+    return () => clearInterval(timer);
+  }, [active, metricsMode, currentView]);
+
+  const dailyChartData = useMemo(() => {
+    if (!daily?.data) return [];
+    return transformDailyData(daily.data);
+  }, [daily]);
+
+  const weeklyChartData = useMemo(() => {
     if (!weekly?.data) return [];
     return transformWeeklyData(weekly.data);
   }, [weekly]);
 
-  // 15초마다 애니메이션 리프레시 (같은 데이터지만 시각 효과)
-  useEffect(() => {
-    if (!active) return;
-    const timer = setInterval(() => setAnimKey((k) => k + 1), 15000);
-    return () => clearInterval(timer);
-  }, [active]);
+  const liveTotal = useMemo(() => {
+    if (!daily?.data) return 0;
+    return getLiveTotal(daily.data);
+  }, [daily]);
+
+  const renderContent = () => {
+    switch (currentView) {
+      case 'daily':
+        return <MetricsChart data={dailyChartData} animKey={animKey} theme={theme} />;
+      case 'weekly':
+        return <MetricsChart data={weeklyChartData} animKey={animKey} theme={theme} />;
+      case 'counter':
+        return <FlipClockCounter value={liveTotal} />;
+    }
+  };
 
   return (
     <div id="metrics-screen" className={`screen ${active ? 'active' : ''}`}>
       <div className="metrics-container">
         <div className="metrics-header">
           <div className="metrics-title">서비스 현황</div>
-          <div className="metrics-view-badge">📈 주간</div>
+          <div className="metrics-view-badge">{VIEW_BADGES[currentView]}</div>
         </div>
         <div className="metrics-chart-area">
-          <MetricsChart data={chartData} animKey={animKey} theme={theme} />
+          {renderContent()}
         </div>
         <div className="metrics-footer"><MetricsClock /></div>
       </div>

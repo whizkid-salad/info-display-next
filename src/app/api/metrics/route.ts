@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ── view=daily / weekly: 차트용 ──
-    const daysBack = 6;
+    const daysBack = view === 'weekly' ? 84 : 14; // weekly=12주(84일), daily=14일
     const start = new Date(now);
     start.setDate(start.getDate() - daysBack);
     start.setHours(0, 0, 0, 0);
