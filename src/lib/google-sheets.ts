@@ -124,7 +124,7 @@ export async function saveMetricsConfig(config: MetricsSheetConfig): Promise<voi
     sheets: config.sheets,
     theme: config.theme || THEME_PRESETS.default,
     rolling: config.rolling || { views: ['daily', 'weekly', 'counter'], interval: 15 },
-  });
+  }, { onConflict: 'id' });
   if (error) throw new Error(error.message);
 }
 
