@@ -23,33 +23,12 @@ export async function GET(request: NextRequest) {
     if (view === 'raw') {
       const page = Math.max(1, Number(searchParams.get('page')) || 1);
       const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 50));
-      const offset = (page - 1) * limit;
 
-      // 전체 날짜 수 계산
-      const { data: countData } = await supabase
-        .from('metrics')
-        .select('recorded_at')
-        .eq('granularity', 'daily');
-
-      const uniqueDates = new Set((countData || []).map((r: any) => r.recorded_at));
-      const totalDates = uniqueDates.size;
-
-      // 날짜 목록 (최신순)
-      const sortedDates = Array.from(uniqueDates).sort().reverse();
-      const pagedDates = sortedDates.slice(offset, offset + limit);
-
-      if (pagedDates.length === 0) {
-        return NextResponse.json({
-          view: 'raw', rows: [], page, limit, totalDates, totalPages: Math.ceil(totalDates / limit),
-        });
-      }
-
-      // 해당 날짜들의 데이터 조회
+      // 전체 데이터를 한번에 조회 (daily만)
       const { data, error } = await supabase
         .from('metrics')
         .select('*')
         .eq('granularity', 'daily')
-        .in('recorded_at', pagedDates)
         .order('recorded_at', { ascending: false });
 
       if (error) throw error;
@@ -74,19 +53,21 @@ export async function GET(request: NextRequest) {
         row[r.metric] = Number(r.value);
       }
 
-      const rows = Array.from(rowMap.values()).sort((a, b) => {
+      const allRows = Array.from(rowMap.values()).sort((a, b) => {
         const dc = b.date.localeCompare(a.date);
         if (dc !== 0) return dc;
         return PRODUCTS.indexOf(a.product) - PRODUCTS.indexOf(b.product);
       });
 
+      // 페이지네이션 (제품 단위가 아닌 날짜 단위)
+      const uniqueDates = Array.from(new Set(allRows.map((r) => r.date)));
+      const totalDates = uniqueDates.length;
+      const totalPages = Math.ceil(totalDates / limit);
+      const pagedDates = new Set(uniqueDates.slice((page - 1) * limit, page * limit));
+      const rows = allRows.filter((r) => pagedDates.has(r.date));
+
       return NextResponse.json({
-        view: 'raw',
-        rows,
-        page,
-        limit,
-        totalDates,
-        totalPages: Math.ceil(totalDates / limit),
+        view: 'raw', rows, page, limit, totalDates, totalPages,
       });
     }
 
