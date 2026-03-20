@@ -118,14 +118,14 @@ export async function getMetricsConfig(): Promise<MetricsSheetConfig> {
 // ── config 저장 ───────────────────────────────────────────────
 export async function saveMetricsConfig(config: MetricsSheetConfig): Promise<void> {
   const supabase = getSupabaseClient();
-  await supabase.from('metrics_config').upsert({
+  const { error } = await supabase.from('metrics_config').upsert({
     id: 'default',
     spreadsheet_id: config.spreadsheetId,
     sheets: config.sheets,
     theme: config.theme || THEME_PRESETS.default,
     rolling: config.rolling || { views: ['daily', 'weekly', 'counter'], interval: 15 },
-    updated_at: new Date().toISOString(),
   });
+  if (error) throw new Error(error.message);
 }
 
 // ── Column letter → 0-based index ─────────────────────────────
