@@ -86,39 +86,81 @@ html, body {
   opacity: 0.6;
 }
 
-/* ===== 환영 템플릿 ===== */
-#welcome-screen {
-  background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 50%, #1e3a5f 100%);
+/* ===== 환영 & 면접 공통 (다크 실크) ===== */
+#welcome-screen,
+#interview-screen {
+  background: #0d0d0d;
   color: #fff;
+  overflow: hidden;
+  justify-content: flex-start;
+  align-items: flex-start;
 }
 
-.welcome-content {
-  text-align: center;
-  padding: 3rem;
+.silk-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.welcome-icon {
-  font-size: 5rem;
-  margin-bottom: 1rem;
+.silk-content {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6vw 7vw;
 }
 
-.welcome-label {
-  font-size: 2.5rem;
+.silk-label {
+  font-size: 2.4vw;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+  margin-bottom: 3.5vw;
+}
+
+.silk-subtitle {
+  font-size: 1.8vw;
   font-weight: 300;
-  letter-spacing: 0.3em;
-  margin-bottom: 2rem;
-  opacity: 0.9;
+  opacity: 0.55;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6vw;
 }
 
-#welcome-screen .event-title {
-  font-size: 5rem;
-  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+.silk-title {
+  font-size: 8.5vw;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
-#welcome-screen .event-subtitle {
-  font-size: 2.2rem;
-  margin-top: 1.5rem;
+.silk-time {
+  position: absolute;
+  top: 3.5vw;
+  right: 5.5vw;
+  font-size: 1.5vw;
+  font-weight: 300;
+  opacity: 0.55;
+  letter-spacing: 0.06em;
+  z-index: 2;
 }
+
+.silk-company {
+  position: absolute;
+  bottom: 3.5vw;
+  left: 7vw;
+  font-size: 1.5vw;
+  opacity: 0.45;
+  letter-spacing: 0.06em;
+  z-index: 2;
+}
+
+.silk-company strong { font-weight: 700; }
+.silk-company span   { font-weight: 300; }
 
 /* ===== 생일 템플릿 ===== */
 #birthday-screen {
@@ -260,39 +302,7 @@ html, body {
   text-shadow: 0 2px 20px rgba(0,0,0,0.3);
 }
 
-/* ===== 면접 템플릿 ===== */
-#interview-screen {
-  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%);
-  color: #fff;
-}
-
-.interview-content {
-  text-align: center;
-  padding: 3rem;
-}
-
-.interview-icon {
-  font-size: 5rem;
-  margin-bottom: 1rem;
-}
-
-.interview-label {
-  font-size: 2.5rem;
-  font-weight: 300;
-  letter-spacing: 0.3em;
-  margin-bottom: 2rem;
-  opacity: 0.9;
-}
-
-#interview-screen .event-title {
-  font-size: 5rem;
-  text-shadow: 0 2px 20px rgba(0,0,0,0.3);
-}
-
-#interview-screen .event-subtitle {
-  font-size: 2.2rem;
-  margin-top: 1.5rem;
-}
+/* #interview-screen → silk 공통 스타일로 통합 (위 참조) */
 
 /* ===== 기본 안내 템플릿 ===== */
 #default-screen {

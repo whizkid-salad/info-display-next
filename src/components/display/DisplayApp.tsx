@@ -68,6 +68,7 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
 
   const title = currentEvent?.title || '';
   const subtitle = currentEvent?.subtitle || '';
+  const time = currentEvent?.start || '';
   const isIdle = currentScreen === 'idle';
 
   return (
@@ -79,11 +80,11 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
         <IdleScreen active={isIdle} />
       )}
 
-      <WelcomeScreen active={currentScreen === 'welcome'} title={title} subtitle={subtitle} />
+      <WelcomeScreen active={currentScreen === 'welcome'} title={title} subtitle={subtitle} time={time} />
       <BirthdayScreen active={currentScreen === 'birthday'} title={title} subtitle={subtitle} />
       <NoticeScreen active={currentScreen === 'notice'} title={title} subtitle={subtitle} />
       <CelebrationScreen active={currentScreen === 'celebration'} title={title} subtitle={subtitle} />
-      <InterviewScreen active={currentScreen === 'interview'} title={title} subtitle={subtitle} />
+      <InterviewScreen active={currentScreen === 'interview'} title={title} subtitle={subtitle} time={time} />
       <DefaultScreen active={currentScreen === 'default'} title={title} subtitle={subtitle} />
 
       <div className={`connection-status ${status}`}>
