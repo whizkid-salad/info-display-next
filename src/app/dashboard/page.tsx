@@ -193,7 +193,10 @@ export default function DashboardPage() {
 
       {/* ===== 이벤트 관리 ===== */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg md:text-xl font-bold text-gray-800">이벤트 관리</h3>
+        <div>
+          <h3 className="text-lg md:text-xl font-bold text-gray-800">이벤트 관리</h3>
+          <p className="text-xs text-gray-400 mt-0.5">🔄 디스플레이 화면 반영 주기 · 30초</p>
+        </div>
         <button onClick={openNewModal} className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ 추가</button>
       </div>
 

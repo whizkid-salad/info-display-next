@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DisplayEvent } from '@/types';
 
-export function useEventPolling(floor: string, intervalMs = 10000) {
+export function useEventPolling(floor: string, intervalMs = 30000) {
   const [events, setEvents] = useState<DisplayEvent[]>([]);
   const [status, setStatus] = useState<'connected' | 'disconnected'>('disconnected');
 
