@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DeviceHeartbeat } from '@/types';
 
-export function useDeviceStatus(intervalMs = 15000) {
+export function useDeviceStatus(intervalMs = 600000) {
   const [devices, setDevices] = useState<DeviceHeartbeat[]>([]);
 
   const fetchDevices = useCallback(async () => {
