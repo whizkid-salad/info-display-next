@@ -87,9 +87,9 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
       <InterviewScreen active={currentScreen === 'interview'} title={title} subtitle={subtitle} time={time} />
       <DefaultScreen active={currentScreen === 'default'} title={title} subtitle={subtitle} />
 
-      <div className={`connection-status ${status}`}>
-        {status === 'disconnected' ? '서버 연결 중...' : ''}
-      </div>
+      {status === 'disconnected' && (
+        <div className="connection-status disconnected">서버 연결 중...</div>
+      )}
     </div>
   );
 }
