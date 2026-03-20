@@ -17,7 +17,11 @@ export async function PUT(
   const body = await request.json();
   const { title, template, subtitle, start, end, floors } = body;
 
-  const toRFC3339 = (dt: string) => (dt && dt.length === 16 ? dt + ':00' : dt);
+  const toRFC3339 = (dt: string) => {
+    if (!dt) return dt;
+    const s = dt.length === 16 ? dt + ':00' : dt;
+    return s.includes('+') || s.endsWith('Z') ? s : s + '+09:00';
+  };
 
   const updates: any = {};
   if (title !== undefined) updates.title = title;

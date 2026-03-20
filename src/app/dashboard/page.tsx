@@ -83,9 +83,11 @@ export default function DashboardPage() {
     setEditingEvent(event);
     const toLocalDT = (iso: string) => {
       if (!iso) return '';
+      // 브라우저 timezone에 무관하게 KST(UTC+9)로 변환
       const d = new Date(iso);
+      const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
       const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      return `${kst.getUTCFullYear()}-${pad(kst.getUTCMonth() + 1)}-${pad(kst.getUTCDate())}T${pad(kst.getUTCHours())}:${pad(kst.getUTCMinutes())}`;
     };
     const f: EventForm = { title: event.title, template: event.template, subtitle: event.subtitle, start: toLocalDT(event.start), end: toLocalDT(event.end), floors: event.floors || ['6'] };
     setForm(f); setOriginalForm({ ...f }); setError(''); setModalOpen(true);
@@ -236,9 +238,9 @@ export default function DashboardPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                  {new Date(e.start).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}{' '}
-                  {new Date(e.start).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                  {' ~ '}{new Date(e.end).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(e.start).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' })}{' '}
+                  {new Date(e.start).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
+                  {' ~ '}{new Date(e.end).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
                 </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button onClick={() => openEditModal(e)} className="text-blue-500 hover:text-blue-700 text-sm mr-3">수정</button>
@@ -286,9 +288,9 @@ export default function DashboardPage() {
             <div className="font-medium text-gray-800 text-sm">{e.title}</div>
             {e.subtitle && <div className="text-xs text-gray-500 mt-0.5">{e.subtitle}</div>}
             <div className="text-xs text-gray-400 mt-1.5">
-              {new Date(e.start).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}{' '}
-              {new Date(e.start).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}{' ~ '}
-              {new Date(e.end).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+              {new Date(e.start).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'short', day: 'numeric' })}{' '}
+              {new Date(e.start).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}{' ~ '}
+              {new Date(e.end).toLocaleTimeString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         ))}

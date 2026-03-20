@@ -57,7 +57,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'title, start, end 필수' }, { status: 400 });
   }
 
-  const toRFC3339 = (dt: string) => (dt && dt.length === 16 ? dt + ':00' : dt);
+  // naive datetime → KST RFC3339 (timezone 없으면 +09:00 붙임)
+  const toRFC3339 = (dt: string) => {
+    if (!dt) return dt;
+    const s = dt.length === 16 ? dt + ':00' : dt;
+    return s.includes('+') || s.endsWith('Z') ? s : s + '+09:00';
+  };
 
   try {
     const supabase = getSupabaseClient();

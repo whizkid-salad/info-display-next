@@ -10,10 +10,11 @@ interface Props {
 function formatEventTime(iso: string): string {
   if (!iso) return '';
   const d = new Date(iso);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hour = d.getHours();
-  const min = d.getMinutes();
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  const month = kst.getUTCMonth() + 1;
+  const day = kst.getUTCDate();
+  const hour = kst.getUTCHours();
+  const min = kst.getUTCMinutes();
   return `${month}월 ${day}일  ${hour}시${min > 0 ? ` ${min}분` : ''}`;
 }
 
