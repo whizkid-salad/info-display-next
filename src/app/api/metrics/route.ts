@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       { view, products: PRODUCTS, labels: PRODUCT_LABELS, data: chartData },
-      { headers: { 'Cache-Control': 's-maxage=30, stale-while-revalidate=60' } }
+      { headers: { 'Cache-Control': 's-maxage=10, stale-while-revalidate=30' } }
     );
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

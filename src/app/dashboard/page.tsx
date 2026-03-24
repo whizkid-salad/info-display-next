@@ -49,7 +49,7 @@ export default function DashboardPage() {
       } catch { /* ignore */ }
     }
     loadDevices();
-    const timer = setInterval(loadDevices, 600000);
+    const timer = setInterval(loadDevices, 60000);
     return () => clearInterval(timer);
   }, []);
 
