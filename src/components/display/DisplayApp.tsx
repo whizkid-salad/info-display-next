@@ -14,6 +14,14 @@ import CelebrationScreen from './CelebrationScreen';
 import InterviewScreen from './InterviewScreen';
 import DefaultScreen from './DefaultScreen';
 
+/** metrics-* 템플릿에서 metricsMode 추출 */
+function getMetricsMode(template: string): 'auto' | 'daily' | 'weekly' | 'counter' {
+  if (template === 'metrics-daily') return 'daily';
+  if (template === 'metrics-weekly') return 'weekly';
+  if (template === 'metrics-counter') return 'counter';
+  return 'auto';
+}
+
 export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 'auto' }: { floor: string; idleMode?: string; metricsMode?: string }) {
   const { events, status } = useEventPolling(floor);
   useHeartbeat({ floor });
@@ -24,32 +32,24 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
   const playlistRef = useRef<{ items: PlaylistItem[]; index: number }>({ items: [], index: 0 });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 플레이리스트 생성 (이벤트 또는 설정 변경 시)
-  const playlist = useMemo(() => {
-    const categorized = categorizeEvents(events, config.groups);
-    const ratios = getCurrentRatio(config.exposure_ratios);
-    return buildPlaylist(categorized, config.priority_order, ratios);
-  }, [events, config]);
-
-  // 매 시간 경계에 비율 재계산을 위한 트리거
+  // 매 시간 경계에 비율 재계산 트리거
   const [hourTick, setHourTick] = useState(0);
   useEffect(() => {
     const now = new Date();
     const msUntilNextHour = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000;
     const timeout = setTimeout(() => {
       setHourTick((t) => t + 1);
-      // 이후 매 시간마다
       const interval = setInterval(() => setHourTick((t) => t + 1), 3600000);
       return () => clearInterval(interval);
     }, msUntilNextHour);
     return () => clearTimeout(timeout);
   }, []);
 
-  // hourTick 변경 시 플레이리스트 강제 갱신 (ratios가 바뀔 수 있으므로)
+  // 플레이리스트 생성
   const playlistWithHour = useMemo(() => {
     const categorized = categorizeEvents(events, config.groups);
     const ratios = getCurrentRatio(config.exposure_ratios);
-    return buildPlaylist(categorized, config.priority_order, ratios);
+    return buildPlaylist(categorized, config.priority_order, ratios, config.groups);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, config, hourTick]);
 
@@ -97,20 +97,20 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
   const title = currentItem?.event?.title || '';
   const subtitle = currentItem?.event?.subtitle || '';
   const time = currentItem?.event?.start || '';
-  const isIdle = currentScreen === 'idle';
-  const isMetrics = currentScreen === 'metrics';
+
+  // 현재 슬롯이 지표 계열인지 판단
+  const isMetricsSlot = currentScreen.startsWith('metrics') || currentScreen === 'idle';
+  const activeMetricsMode = isMetricsSlot ? getMetricsMode(currentScreen) : (metricsMode as any);
+
+  // idleMode=clock 이면 이벤트 없을 때 시계 표시
+  const showClock = idleMode === 'clock' && currentScreen === 'idle';
 
   return (
     <div id="app" onClick={handleClick}>
-      {/* metrics 슬롯 또는 유휴 시 */}
-      {idleMode === 'metrics' || idleMode === 'clock' ? (
-        idleMode === 'clock' ? (
-          <IdleScreen active={isIdle} />
-        ) : (
-          <MetricsScreen active={isIdle || isMetrics} metricsMode={metricsMode as any} />
-        )
+      {showClock ? (
+        <IdleScreen active={true} />
       ) : (
-        <MetricsScreen active={isIdle || isMetrics} metricsMode={metricsMode as any} />
+        <MetricsScreen active={isMetricsSlot} metricsMode={activeMetricsMode} />
       )}
 
       <WelcomeScreen active={currentScreen === 'welcome'} title={title} subtitle={subtitle} time={time} />

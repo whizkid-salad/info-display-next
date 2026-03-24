@@ -50,7 +50,7 @@ export const DEFAULT_DISPLAY_CONFIG: DisplayConfig = {
   id: 'default',
   groups: {
     group1: ['welcome', 'interview'],
-    group2: ['notice', 'default'],
+    group2: ['metrics-counter', 'metrics-daily', 'metrics-weekly', 'notice', 'default'],
     group3: ['birthday', 'celebration'],
   },
   priority_order: ['group1', 'group2', 'group3'],

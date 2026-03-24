@@ -6,6 +6,13 @@ export interface PlaylistItem {
   event?: DisplayEvent;
 }
 
+const METRICS_TEMPLATES = ['metrics-counter', 'metrics-daily', 'metrics-weekly', 'metrics'];
+
+/** 템플릿이 지표 항목인지 확인 */
+export function isMetricsTemplate(template: string): boolean {
+  return METRICS_TEMPLATES.includes(template);
+}
+
 /**
  * 이벤트를 그룹별로 분류
  */
@@ -46,43 +53,63 @@ export function getCurrentRatio(
 }
 
 /**
+ * 그룹의 모든 가용 항목 수집
+ * - 지표 템플릿(metrics-*)은 항상 포함
+ * - 이벤트 템플릿은 active 이벤트가 있을 때만 포함
+ */
+function getGroupItems(
+  groupKey: string,
+  groupTemplates: string[],
+  events: DisplayEvent[]
+): PlaylistItem[] {
+  const items: PlaylistItem[] = [];
+
+  for (const template of groupTemplates) {
+    if (isMetricsTemplate(template)) {
+      items.push({ type: 'metrics', template });
+    } else {
+      const matching = events.filter((e) => e.template === template);
+      for (const ev of matching) {
+        items.push({ type: 'event', template: ev.template, event: ev });
+      }
+    }
+  }
+
+  return items;
+}
+
+/**
  * 가중치 기반 재생 목록 생성
  *
  * - G1 이벤트가 있으면 G1만 반환
  * - 없으면 G2/G3를 가중치 비율로 인터리브
- * - G2에는 항상 metrics 항목이 포함됨
+ * - 각 항목은 플레이리스트의 독립 슬롯으로 N초씩 표시됨
  */
 export function buildPlaylist(
   categorized: Record<string, DisplayEvent[]>,
   priorityOrder: string[],
-  ratios: Record<string, number>
+  ratios: Record<string, number>,
+  groupConfig: Record<string, string[]>
 ): PlaylistItem[] {
-  // 최우선 그룹(G1) 체크
+  // 최우선 그룹(G1) 체크 — 지표 항목 없이 이벤트만
   const topGroup = priorityOrder[0];
-  if (categorized[topGroup] && categorized[topGroup].length > 0) {
-    return categorized[topGroup].map((ev) => ({
+  const topEvents = categorized[topGroup] || [];
+  if (topEvents.length > 0) {
+    return topEvents.map((ev) => ({
       type: 'event' as const,
       template: ev.template,
       event: ev,
     }));
   }
 
-  // 나머지 그룹의 항목 수집
+  // 나머지 그룹의 항목 수집 (지표 포함)
   const remainingGroups = priorityOrder.slice(1);
   const groupItems: Record<string, PlaylistItem[]> = {};
 
   for (const gKey of remainingGroups) {
-    const items: PlaylistItem[] = [];
-
-    // G2(group2)에는 metrics 항목을 항상 포함
-    if (gKey === 'group2') {
-      items.push({ type: 'metrics', template: 'metrics' });
-    }
-
-    for (const ev of categorized[gKey] || []) {
-      items.push({ type: 'event', template: ev.template, event: ev });
-    }
-
+    const templates = groupConfig[gKey] || [];
+    const allEvents = Object.values(categorized).flat();
+    const items = getGroupItems(gKey, templates, allEvents);
     if (items.length > 0) {
       groupItems[gKey] = items;
     }
@@ -90,21 +117,19 @@ export function buildPlaylist(
 
   const activeGroups = Object.keys(groupItems);
   if (activeGroups.length === 0) {
-    // 아무 이벤트도 없으면 metrics만
-    return [{ type: 'metrics', template: 'metrics' }];
+    return [{ type: 'metrics', template: 'metrics-daily' }];
   }
 
   if (activeGroups.length === 1) {
     return groupItems[activeGroups[0]];
   }
 
-  // 가중치 인터리브 생성
   return interleave(groupItems, ratios);
 }
 
 /**
  * 가중치 비율에 따라 그룹 항목을 인터리브
- * 예: { group2: 5, group3: 1 } → [g2,g2,g2,g2,g2,g3] 비율로 배치
+ * 각 슬롯은 해당 그룹의 다음 항목을 순환하며 가져옴
  */
 function interleave(
   groupItems: Record<string, PlaylistItem[]>,
@@ -121,9 +146,7 @@ function interleave(
   const counters: Record<string, number> = {};
   for (const g of groups) counters[g] = 0;
 
-  // 총 슬롯 수 = totalWeight 기반으로 배치
   for (let slot = 0; slot < totalWeight; slot++) {
-    // 비율에 따라 어느 그룹의 차례인지 결정
     let acc = 0;
     for (const g of groups) {
       acc += ratios[g] || 1;

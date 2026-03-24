@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { DisplayConfig, ExposureRatios, TimeSlotRatio, DEFAULT_DISPLAY_CONFIG } from '@/types';
 
 const TEMPLATE_OPTIONS = [
+  { value: 'metrics-counter', label: '🔢 지표 카운터' },
+  { value: 'metrics-daily', label: '📈 지표 일간 차트' },
+  { value: 'metrics-weekly', label: '📊 지표 주간 차트' },
   { value: 'welcome', label: '🤝 환영' },
   { value: 'interview', label: '💼 면접' },
   { value: 'birthday', label: '🎂 생일' },
@@ -178,7 +181,7 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-start gap-2">
             <span className="text-blue-500 font-bold mt-0.5">4.</span>
-            <p><strong>지표(Metrics)</strong> 화면은 항상 Group 2 롤링 목록에 포함되어, 공지/안내 이벤트와 함께 순환됩니다.</p>
+            <p><strong>지표 화면</strong>(카운터/일간/주간)은 이벤트처럼 그룹에 추가할 수 있으며, 각각 독립 슬롯으로 N초씩 표시됩니다.</p>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-blue-500 font-bold mt-0.5">5.</span>
