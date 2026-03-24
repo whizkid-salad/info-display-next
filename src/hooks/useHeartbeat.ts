@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
  * URL에 kiosk=1 파라미터가 있을 때만 동작
  * PC 상태는 OS 레벨(PS1 스크립트)에서 별도 전송
  */
-export function useHeartbeat({ floor, intervalMs = 30000 }: { floor: string; intervalMs?: number }) {
+export function useHeartbeat({ floor, intervalMs = 60000 }: { floor: string; intervalMs?: number }) {
   const floorRef = useRef(floor);
   floorRef.current = floor;
 
