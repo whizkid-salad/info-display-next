@@ -90,7 +90,8 @@ html, body {
 
 /* ===== 환영 & 면접 공통 (다크 실크) ===== */
 #welcome-screen,
-#interview-screen {
+#interview-screen,
+#g1-screen {
   background: #0d0d0d;
   color: #fff;
   overflow: hidden;
