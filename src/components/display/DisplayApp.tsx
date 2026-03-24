@@ -5,13 +5,13 @@ import { useHeartbeat } from '@/hooks/useHeartbeat';
 import { useDisplayConfig } from '@/hooks/useDisplayConfig';
 import { DisplayEvent } from '@/types';
 import { categorizeEvents, getCurrentRatio, buildPlaylist, PlaylistItem } from '@/lib/display-scheduler';
+import { classifyG1Events } from '@/lib/g1-scheduler';
 import IdleScreen from './IdleScreen';
 import MetricsScreen from './MetricsScreen';
-import WelcomeScreen from './WelcomeScreen';
+import G1Screen from './G1Screen';
 import BirthdayScreen from './BirthdayScreen';
 import NoticeScreen from './NoticeScreen';
 import CelebrationScreen from './CelebrationScreen';
-import InterviewScreen from './InterviewScreen';
 import DefaultScreen from './DefaultScreen';
 
 /** metrics-* 템플릿에서 metricsMode 추출 */
@@ -32,6 +32,23 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
   const playlistRef = useRef<{ items: PlaylistItem[]; index: number }>({ items: [], index: 0 });
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // G1 이벤트 감지 (확장된 시간 윈도우 적용)
+  const [g1Tick, setG1Tick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setG1Tick((t) => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const g1Templates = config.groups.group1 || ['welcome', 'interview'];
+  const g1Events = useMemo(() => {
+    const raw = events.filter((e) => g1Templates.includes(e.template));
+    return classifyG1Events(raw);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, g1Templates.join(','), g1Tick]);
+
+  const hasG1 = g1Events.length > 0;
+  const g1RawEvents = useMemo(() => g1Events.map((i) => i.event), [g1Events]);
+
   // 매 시간 경계에 비율 재계산 트리거
   const [hourTick, setHourTick] = useState(0);
   useEffect(() => {
@@ -45,23 +62,29 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
     return () => clearTimeout(timeout);
   }, []);
 
-  // 플레이리스트 생성
+  // G2/G3 플레이리스트 (G1이 없을 때만 사용)
   const playlistWithHour = useMemo(() => {
+    if (hasG1) return [];
     const categorized = categorizeEvents(events, config.groups);
     const ratios = getCurrentRatio(config.exposure_ratios);
     return buildPlaylist(categorized, config.priority_order, ratios, config.groups);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, config, hourTick]);
+  }, [events, config, hourTick, hasG1]);
 
-  // 롤링 타이머
+  // G2/G3 롤링 타이머
   useEffect(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    const items = playlistWithHour;
+    if (hasG1) {
+      setCurrentItem(null);
+      setCurrentScreen('g1');
+      return;
+    }
 
+    const items = playlistWithHour;
     if (items.length === 0) {
       setCurrentItem(null);
       setCurrentScreen('idle');
@@ -86,7 +109,7 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [playlistWithHour, config.rolling_interval]);
+  }, [playlistWithHour, config.rolling_interval, hasG1]);
 
   const handleClick = () => {
     if (!document.fullscreenElement) {
@@ -98,11 +121,8 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
   const subtitle = currentItem?.event?.subtitle || '';
   const time = currentItem?.event?.start || '';
 
-  // 현재 슬롯이 지표 계열인지 판단
   const isMetricsSlot = currentScreen.startsWith('metrics') || currentScreen === 'idle';
   const activeMetricsMode = isMetricsSlot ? getMetricsMode(currentScreen) : (metricsMode as any);
-
-  // idleMode=clock 이면 이벤트 없을 때 시계 표시
   const showClock = idleMode === 'clock' && currentScreen === 'idle';
 
   return (
@@ -110,14 +130,16 @@ export default function DisplayApp({ floor, idleMode = 'metrics', metricsMode = 
       {showClock ? (
         <IdleScreen active={true} />
       ) : (
-        <MetricsScreen active={isMetricsSlot} metricsMode={activeMetricsMode} />
+        <MetricsScreen active={isMetricsSlot && !hasG1} metricsMode={activeMetricsMode} />
       )}
 
-      <WelcomeScreen active={currentScreen === 'welcome'} title={title} subtitle={subtitle} time={time} />
+      {/* G1 통합 화면 */}
+      <G1Screen active={hasG1} events={g1RawEvents} />
+
+      {/* G2/G3 이벤트 화면 */}
       <BirthdayScreen active={currentScreen === 'birthday'} title={title} subtitle={subtitle} />
       <NoticeScreen active={currentScreen === 'notice'} title={title} subtitle={subtitle} />
       <CelebrationScreen active={currentScreen === 'celebration'} title={title} subtitle={subtitle} />
-      <InterviewScreen active={currentScreen === 'interview'} title={title} subtitle={subtitle} time={time} />
       <DefaultScreen active={currentScreen === 'default'} title={title} subtitle={subtitle} />
 
       {status === 'disconnected' && (

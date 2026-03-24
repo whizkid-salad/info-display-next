@@ -30,12 +30,16 @@ export async function GET(
     // 2) Supabase 대시보드 이벤트 (현재 활성인 것만)
     try {
       const supabase = getSupabaseClient();
-      const now = new Date().toISOString();
+      const now = new Date();
+      // G1(환영/면접) 이벤트는 시작 25분 전 ~ 종료 10분 후 표시
+      // 넉넉하게 시작 30분 전 ~ 종료 15분 후 범위로 쿼리
+      const windowStart = new Date(now.getTime() + 30 * 60000).toISOString();
+      const windowEnd = new Date(now.getTime() - 15 * 60000).toISOString();
       const { data } = await supabase
         .from('dashboard_events')
         .select('*')
-        .lte('start_time', now)
-        .gte('end_time', now);
+        .lte('start_time', windowStart)
+        .gte('end_time', windowEnd);
 
       for (const row of data || []) {
         // 해당 층이 대상에 포함되어야 표시
