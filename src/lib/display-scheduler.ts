@@ -131,26 +131,42 @@ export function buildPlaylist(
  * 가중치 비율에 따라 그룹 항목을 인터리브
  * 각 슬롯은 해당 그룹의 다음 항목을 순환하며 가져옴
  */
+/**
+ * 가중치 비율에 따라 그룹 항목을 인터리브
+ * 모든 그룹의 모든 아이템이 최소 1번 이상 표시되도록 사이클 확장
+ *
+ * 예: G2(3아이템, 비율5) + G3(2아이템, 비율1) → totalWeight=6
+ *   1사이클: G2 5슬롯 + G3 1슬롯 → G3의 2번째 아이템 누락
+ *   → ceil(2/1)=2 사이클 필요 → 12슬롯으로 확장하여 모든 아이템 포함
+ */
 function interleave(
   groupItems: Record<string, PlaylistItem[]>,
   ratios: Record<string, number>
 ): PlaylistItem[] {
   const groups = Object.keys(groupItems);
-  const totalWeight = groups.reduce((sum, g) => sum + (ratios[g] || 1), 0);
+  const weightPerCycle = groups.reduce((sum, g) => sum + (ratios[g] || 1), 0);
 
-  if (totalWeight === 0) {
+  if (weightPerCycle === 0) {
     return groups.flatMap((g) => groupItems[g]);
   }
+
+  // 모든 그룹의 모든 아이템이 1번 이상 나오려면 필요한 사이클 수
+  const cyclesNeeded = Math.max(
+    1,
+    ...groups.map((g) => Math.ceil(groupItems[g].length / (ratios[g] || 1)))
+  );
+  const totalSlots = weightPerCycle * cyclesNeeded;
 
   const playlist: PlaylistItem[] = [];
   const counters: Record<string, number> = {};
   for (const g of groups) counters[g] = 0;
 
-  for (let slot = 0; slot < totalWeight; slot++) {
+  for (let slot = 0; slot < totalSlots; slot++) {
+    const slotInCycle = slot % weightPerCycle;
     let acc = 0;
     for (const g of groups) {
       acc += ratios[g] || 1;
-      if (slot < acc) {
+      if (slotInCycle < acc) {
         const items = groupItems[g];
         const item = items[counters[g] % items.length];
         playlist.push(item);
