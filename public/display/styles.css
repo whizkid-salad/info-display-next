@@ -114,8 +114,9 @@ html, body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 6vw 7vw;
+  padding-top: 10vw;
 }
 
 .silk-label {
@@ -135,7 +136,7 @@ html, body {
 }
 
 .silk-title {
-  font-size: 8.5vw;
+  font-size: 6vw;
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.1;
