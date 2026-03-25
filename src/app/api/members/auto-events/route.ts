@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
         if (eventDate) {
           const birthYear = new Date(member.birthday).getUTCFullYear();
           const age = eventDate.getUTCFullYear() - birthYear;
-          const startTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T09:00:00+09:00`;
-          const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T18:00:00+09:00`;
+          const startTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T08:00:00+09:00`;
+          const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T20:00:00+09:00`;
 
           await supabase.from('dashboard_events').insert({
             title: `🎂 ${member.name} 님의 생일입니다`,
@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
         if (eventDate) {
           const hireYear = new Date(member.hire_date).getUTCFullYear();
           const years = eventDate.getUTCFullYear() - hireYear;
-          const startTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T09:00:00+09:00`;
-          const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T18:00:00+09:00`;
+          const startTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T08:00:00+09:00`;
+          const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T20:00:00+09:00`;
 
           await supabase.from('dashboard_events').insert({
             title: years === 0 ? `🎉 ${member.name} 님의 입사를 환영합니다!` : `🎉 ${member.name} 님의 ${years}주년 입사일입니다`,
