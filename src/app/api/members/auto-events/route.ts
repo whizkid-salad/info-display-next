@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/lib/supabase-server';
+import { fetchNotionMembers } from '@/lib/notion';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,11 @@ function anniversaryInRange(dateStr: string, rangeStart: Date, rangeEnd: Date): 
   return null;
 }
 
+// Vercel Cron은 GET 요청을 보내므로 GET도 동일하게 처리
+export async function GET(request: NextRequest) {
+  return POST(request);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabaseClient();
@@ -37,7 +43,25 @@ export async function POST(request: NextRequest) {
     const nextSunday = new Date(nextMonday);
     nextSunday.setUTCDate(nextMonday.getUTCDate() + 6);
 
-    // 멤버 목록
+    // 1) 노션 → Supabase 멤버 동기화
+    let syncedCount = 0;
+    try {
+      const notionMembers = await fetchNotionMembers();
+      const rows = notionMembers.map(m => ({
+        notion_id: m.notionId,
+        name: m.name,
+        email: m.email || null,
+        birthday: m.birthday || null,
+        hire_date: m.hireDate || null,
+        synced_at: new Date().toISOString(),
+      }));
+      await supabase.from('members').upsert(rows, { onConflict: 'notion_id' });
+      syncedCount = rows.length;
+    } catch (e) {
+      console.error('Notion sync error (계속 진행):', e);
+    }
+
+    // 2) 멤버 목록
     const { data: members, error: membersError } = await supabase.from('members').select('*');
     if (membersError) throw membersError;
 
@@ -87,7 +111,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, created: createdEvents, range: { from: nextMonday.toISOString().slice(0,10), to: nextSunday.toISOString().slice(0,10) } });
+    return NextResponse.json({ ok: true, synced: syncedCount, created: createdEvents, range: { from: nextMonday.toISOString().slice(0,10), to: nextSunday.toISOString().slice(0,10) } });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
