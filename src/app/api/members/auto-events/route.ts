@@ -61,11 +61,26 @@ export async function POST(request: NextRequest) {
       console.error('Notion sync error (계속 진행):', e);
     }
 
-    // 2) 멤버 목록
+    // 2) 다음 주 범위의 기존 이벤트 조회 (중복 방지용)
+    const rangeStart = nextMonday.toISOString();
+    const rangeEnd = new Date(nextSunday.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    const { data: existingEvents } = await supabase
+      .from('dashboard_events')
+      .select('title, start_time')
+      .gte('start_time', rangeStart)
+      .lt('start_time', rangeEnd);
+
+    // "제목|YYYY-MM-DD" 형태로 Set 구성
+    const existingKeys = new Set(
+      (existingEvents || []).map(e => `${e.title}|${e.start_time.slice(0, 10)}`)
+    );
+
+    // 3) 멤버 목록
     const { data: members, error: membersError } = await supabase.from('members').select('*');
     if (membersError) throw membersError;
 
     const createdEvents: string[] = [];
+    const skippedEvents: string[] = [];
 
     for (const member of members || []) {
       // 생일 체크
@@ -77,15 +92,21 @@ export async function POST(request: NextRequest) {
           const startTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T08:00:00+09:00`;
           const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T20:00:00+09:00`;
 
-          await supabase.from('dashboard_events').insert({
-            title: `🎂 ${member.name} 님의 생일입니다`,
-            template: 'birthday',
-            subtitle: `Happy Birthday! 🎉`,
-            start_time: startTime,
-            end_time: endTime,
-            floors: ['6', '8'],
-          });
-          createdEvents.push(`birthday:${member.name}`);
+          const birthdayTitle = `🎂 ${member.name} 님의 생일입니다`;
+          const dateKey = startTime.slice(0, 10);
+          if (existingKeys.has(`${birthdayTitle}|${dateKey}`)) {
+            skippedEvents.push(`birthday:${member.name}(dup)`);
+          } else {
+            await supabase.from('dashboard_events').insert({
+              title: birthdayTitle,
+              template: 'birthday',
+              subtitle: `Happy Birthday! 🎉`,
+              start_time: startTime,
+              end_time: endTime,
+              floors: ['6', '8'],
+            });
+            createdEvents.push(`birthday:${member.name}`);
+          }
         }
       }
 
@@ -98,20 +119,26 @@ export async function POST(request: NextRequest) {
           const startTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T08:00:00+09:00`;
           const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T20:00:00+09:00`;
 
-          await supabase.from('dashboard_events').insert({
-            title: years === 0 ? `🎉 ${member.name} 님의 입사를 환영합니다!` : `🎉 ${member.name} 님의 ${years}주년 입사일입니다`,
-            template: 'celebration',
-            subtitle: years === 0 ? `입사를 축하합니다!` : `입사 ${years}주년을 축하합니다!`,
-            start_time: startTime,
-            end_time: endTime,
-            floors: ['6', '8'],
-          });
-          createdEvents.push(`hire:${member.name}:${years}yr`);
+          const hireTitle = years === 0 ? `🎉 ${member.name} 님의 입사를 환영합니다!` : `🎉 ${member.name} 님의 ${years}주년 입사일입니다`;
+          const hireDateKey = startTime.slice(0, 10);
+          if (existingKeys.has(`${hireTitle}|${hireDateKey}`)) {
+            skippedEvents.push(`hire:${member.name}:${years}yr(dup)`);
+          } else {
+            await supabase.from('dashboard_events').insert({
+              title: hireTitle,
+              template: 'celebration',
+              subtitle: years === 0 ? `입사를 축하합니다!` : `입사 ${years}주년을 축하합니다!`,
+              start_time: startTime,
+              end_time: endTime,
+              floors: ['6', '8'],
+            });
+            createdEvents.push(`hire:${member.name}:${years}yr`);
+          }
         }
       }
     }
 
-    return NextResponse.json({ ok: true, synced: syncedCount, created: createdEvents, range: { from: nextMonday.toISOString().slice(0,10), to: nextSunday.toISOString().slice(0,10) } });
+    return NextResponse.json({ ok: true, synced: syncedCount, created: createdEvents, skipped: skippedEvents, range: { from: nextMonday.toISOString().slice(0,10), to: nextSunday.toISOString().slice(0,10) } });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
