@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
           const endTime = `${eventDate.getUTCFullYear()}-${String(eventDate.getUTCMonth()+1).padStart(2,'0')}-${String(eventDate.getUTCDate()).padStart(2,'0')}T18:00:00+09:00`;
 
           await supabase.from('dashboard_events').insert({
-            title: `🎉 ${member.name} 님의 ${years}주년 입사일입니다`,
+            title: years === 0 ? `🎉 ${member.name} 님의 입사를 환영합니다!` : `🎉 ${member.name} 님의 ${years}주년 입사일입니다`,
             template: 'celebration',
-            subtitle: `입사 ${years}주년을 축하합니다!`,
+            subtitle: years === 0 ? `입사를 축하합니다!` : `입사 ${years}주년을 축하합니다!`,
             start_time: startTime,
             end_time: endTime,
             floors: ['6', '8'],
