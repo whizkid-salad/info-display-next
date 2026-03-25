@@ -25,13 +25,13 @@ export async function GET() {
 
   const now = Date.now();
   const devices = (data || []).map((d) => {
-    // PC 온라인: pc_updated_at 기준 (없으면 updated_at 폴백)
-    const pcTs = d.pc_updated_at || d.updated_at;
-    const isPcOnline = d.pc_status === 'on' && (now - new Date(pcTs).getTime() < ONLINE_THRESHOLD_MS);
+    // PC 온라인: pc_updated_at 기준만 사용 (폴백 없음 - updated_at 오탐 방지)
+    const isPcOnline = !!d.pc_updated_at && d.pc_status === 'on'
+      && (now - new Date(d.pc_updated_at).getTime() < ONLINE_THRESHOLD_MS);
 
-    // 모니터 켜짐: monitor_updated_at 기준 (없으면 updated_at 폴백)
-    const monTs = d.monitor_updated_at || d.updated_at;
-    const isMonitorOn = d.monitor_status === 'on' && (now - new Date(monTs).getTime() < ONLINE_THRESHOLD_MS);
+    // 모니터 켜짐: monitor_updated_at 기준만 사용 (폴백 없음)
+    const isMonitorOn = !!d.monitor_updated_at && d.monitor_status === 'on'
+      && (now - new Date(d.monitor_updated_at).getTime() < ONLINE_THRESHOLD_MS);
 
     return {
       ...d,
