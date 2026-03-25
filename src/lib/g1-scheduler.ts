@@ -58,7 +58,7 @@ export function getG1Label(template: string, phase: G1Phase): string {
     case 'in-progress':
       return '현재 진행중 일정';
     case 'post-event':
-      return '방문해주셔서 감사합니다';
+      return '방문해주셔서\n감사합니다';
   }
 }
 

@@ -125,6 +125,7 @@ html, body {
   letter-spacing: 0.12em;
   opacity: 0.85;
   margin-bottom: 1vw;
+  white-space: pre-line;
 }
 
 .silk-subtitle {
@@ -164,6 +165,34 @@ html, body {
   height: 2vw;
   width: auto;
   opacity: 0.7;
+}
+
+/* ===== G1 롤링 프로그레스바 ===== */
+.g1-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  display: flex;
+  gap: 3px;
+  z-index: 10;
+  padding: 0 3px;
+}
+
+.g1-progress-segment {
+  flex: 1;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.g1-progress-fill {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 2px;
+  transition: none;
 }
 
 /* ===== G1 분할 레이아웃 ===== */
@@ -224,6 +253,10 @@ html, body {
   position: absolute;
   top: 3.5vw;
   right: 5.5vw;
+}
+
+.g1-right .silk-company {
+  left: 5vw;
 }
 
 /* ===== 생일 템플릿 ===== */
