@@ -19,27 +19,59 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const now = new Date();
-  const timeMin = searchParams.get('timeMin') || new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const timeMax = searchParams.get('timeMax') || new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30, 23, 59, 59).toISOString();
+  const timeMin = searchParams.get('timeMin') || new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString();
+  const timeMax = searchParams.get('timeMax') || new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60, 23, 59, 59).toISOString();
 
   const allEvents: any[] = [];
+  const supabase = getSupabaseClient();
 
-  // 1) Google Calendar 이벤트
+  // 0) 오버라이드 맵 구성
+  const overrideMap: Record<string, any> = {};
+  try {
+    const { data: overrides } = await supabase
+      .from('dashboard_events')
+      .select('*')
+      .not('calendar_event_id', 'is', null);
+    for (const ov of overrides || []) {
+      overrideMap[ov.calendar_event_id] = ov;
+    }
+  } catch (e) {
+    console.error('Override fetch error:', e);
+  }
+
+  // 1) Google Calendar 이벤트 (오버라이드 적용)
   try {
     const calEvents = await listAllFloorsEvents(timeMin, timeMax);
-    allEvents.push(...calEvents);
+    for (const ev of calEvents) {
+      const ov = overrideMap[ev.id];
+      if (ov) {
+        allEvents.push({
+          id: ev.id,
+          title: ov.title,
+          template: ov.template || 'default',
+          subtitle: ov.subtitle || '',
+          start: ov.start_time,
+          end: ov.end_time,
+          source: 'calendar_override',
+          floors: ev.floors,
+          eventIds: ev.eventIds,
+        });
+      } else {
+        allEvents.push(ev);
+      }
+    }
   } catch (e) {
     console.error('Calendar list error:', e);
   }
 
-  // 2) Supabase 대시보드 이벤트
+  // 2) Supabase 대시보드 이벤트 (오버라이드 rows 제외)
   try {
-    const supabase = getSupabaseClient();
     const { data } = await supabase
       .from('dashboard_events')
       .select('*')
       .gte('end_time', timeMin)
       .lte('start_time', timeMax)
+      .is('calendar_event_id', null)
       .order('start_time', { ascending: true });
 
     for (const row of data || []) {
@@ -58,9 +90,7 @@ export async function GET(request: NextRequest) {
     console.error('Supabase events error:', e);
   }
 
-  // 시작시간 순 정렬
   allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-
   return NextResponse.json({ events: allEvents });
 }
 

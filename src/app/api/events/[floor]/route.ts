@@ -17,32 +17,63 @@ export async function GET(
 
   try {
     const allEvents: DisplayEvent[] = [];
+    const supabase = getSupabaseClient();
 
-    // 1) Google Calendar 이벤트
+    // 0) 오버라이드 맵 구성 (floor-specific event ID → override)
+    const overrideByCalId: Record<string, any> = {};
+    try {
+      const { data: overrides } = await supabase
+        .from('dashboard_events')
+        .select('*')
+        .not('calendar_event_id', 'is', null);
+      for (const ov of overrides || []) {
+        if (ov.calendar_event_id) overrideByCalId[ov.calendar_event_id] = ov;
+        if (ov.calendar_event_ids?.[floor]) {
+          overrideByCalId[ov.calendar_event_ids[floor]] = ov;
+        }
+      }
+    } catch (e) {
+      console.error('Override fetch error:', e);
+    }
+
+    // 1) Google Calendar 이벤트 (오버라이드 적용)
     try {
       const calendarId = getFloorCalendarId(floor);
       const calEvents = await getActiveEvents(calendarId);
-      allEvents.push(...calEvents);
+      for (const ev of calEvents) {
+        const ov = overrideByCalId[ev.id];
+        if (ov) {
+          allEvents.push({
+            id: ev.id,
+            title: ov.title,
+            template: ov.template || 'default',
+            subtitle: ov.subtitle || '',
+            start: ov.start_time,
+            end: ov.end_time,
+            source: 'calendar_override' as any,
+            floors: ev.floors,
+          });
+        } else {
+          allEvents.push(ev);
+        }
+      }
     } catch (e) {
       console.error('Calendar error:', e);
     }
 
-    // 2) Supabase 대시보드 이벤트 (현재 활성인 것만)
+    // 2) Supabase 대시보드 이벤트 (오버라이드 rows 제외, 현재 활성인 것만)
     try {
-      const supabase = getSupabaseClient();
       const now = new Date();
-      // G1(환영/면접) 이벤트는 시작 25분 전 ~ 종료 10분 후 표시
-      // 넉넉하게 시작 30분 전 ~ 종료 15분 후 범위로 쿼리
       const windowStart = new Date(now.getTime() + 30 * 60000).toISOString();
       const windowEnd = new Date(now.getTime() - 15 * 60000).toISOString();
       const { data } = await supabase
         .from('dashboard_events')
         .select('*')
         .lte('start_time', windowStart)
-        .gte('end_time', windowEnd);
+        .gte('end_time', windowEnd)
+        .is('calendar_event_id', null);
 
       for (const row of data || []) {
-        // 해당 층이 대상에 포함되어야 표시
         const floors: string[] = row.floors || [];
         if (floors.includes(floor)) {
           allEvents.push({
