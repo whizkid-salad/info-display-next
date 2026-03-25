@@ -8,7 +8,7 @@ export interface G1EventItem {
 }
 
 const G1_PRE_MINUTES = 25;
-const G1_POST_MINUTES = 10;
+const G1_POST_MINUTES = 15;
 
 /**
  * G1 이벤트의 현재 단계를 판별

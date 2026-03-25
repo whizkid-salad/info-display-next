@@ -51,7 +51,7 @@ export async function getActiveEvents(calendarId: string): Promise<DisplayEvent[
   // G1 이벤트를 포함한 확장 윈도우 필터
   // upcoming: 시작 25분 전부터, post-event: 종료 10분 후까지
   const G1_PRE_MS = 25 * 60 * 1000;
-  const G1_POST_MS = 10 * 60 * 1000;
+  const G1_POST_MS = 15 * 60 * 1000;
   const nowMs = now.getTime();
 
   return (res.data.items || [])
