@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: '대시보드', icon: '📺' },
+  { href: '/dashboard/members', label: '멤버 관리', icon: '👥' },
   { href: '/dashboard/metrics', label: '지표 관리', icon: '📊' },
   { href: '/dashboard/templates', label: '인포 템플릿', icon: '🎨' },
   { href: '/dashboard/settings', label: '표시 설정', icon: '⚙️' },

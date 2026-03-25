@@ -3,6 +3,10 @@
     {
       "path": "/api/metrics/sync",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/members/auto-events",
+      "schedule": "0 0 * * 0"
     }
   ]
 }
