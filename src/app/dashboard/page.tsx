@@ -26,6 +26,19 @@ function formatTimeRange(start: string, end: string): string {
   return `${sDate} ${sTime} ~ ${eTime}`;
 }
 
+function getEventStatus(start: string, end: string): 'upcoming' | 'ongoing' | 'ended' {
+  const now = new Date();
+  if (new Date(end) < now) return 'ended';
+  if (new Date(start) > now) return 'upcoming';
+  return 'ongoing';
+}
+
+const STATUS_CONFIG = {
+  upcoming: { text: '예정', cls: 'bg-blue-50 text-blue-600 border border-blue-200' },
+  ongoing:  { text: '진행중', cls: 'bg-green-50 text-green-700 border border-green-200' },
+  ended:    { text: '종료', cls: 'bg-gray-100 text-gray-400 border border-gray-200' },
+};
+
 interface EventForm {
   title: string;
   template: string;
@@ -43,6 +56,9 @@ export default function DashboardPage() {
   const [page, setPage] = useState(1);
   const [fullscreenFloor, setFullscreenFloor] = useState<string | null>(null);
   const [idleModes, setIdleModes] = useState<Record<string, string>>({ '6': 'metrics', '8': 'metrics' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [rangeMths, setRangeMths] = useState(3);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'ended'>('all');
 
   // 이벤트 모달
   const [modalOpen, setModalOpen] = useState(false);
@@ -68,8 +84,8 @@ export default function DashboardPage() {
 
   const loadEvents = useCallback(async () => {
     const now = new Date();
-    const timeMin = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).toISOString();
-    const timeMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 60, 23, 59, 59).toISOString();
+    const timeMin = new Date(now.getFullYear(), now.getMonth() - rangeMths, now.getDate()).toISOString();
+    const timeMax = new Date(now.getFullYear(), now.getMonth() + 2, now.getDate(), 23, 59, 59).toISOString();
     try {
       const res = await fetch(`/api/calendar?timeMin=${timeMin}&timeMax=${timeMax}`);
       const data = await res.json();
@@ -78,7 +94,7 @@ export default function DashboardPage() {
       const past = raw.filter(e => new Date(e.end) < now).sort((a, b) => new Date(b.start).getTime() - new Date(a.start).getTime());
       setEvents([...upcoming, ...past]);
     } catch { setEvents([]); }
-  }, []);
+  }, [rangeMths]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
@@ -188,8 +204,19 @@ export default function DashboardPage() {
     loadEvents();
   };
 
-  const totalPages = Math.max(1, Math.ceil(events.length / PAGE_SIZE));
-  const pagedEvents = events.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [searchQuery, statusFilter, rangeMths]);
+
+  const filteredEvents = events.filter(e => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      if (!e.title.toLowerCase().includes(q) && !(e.subtitle || '').toLowerCase().includes(q)) return false;
+    }
+    if (statusFilter !== 'all' && getEventStatus(e.start, e.end) !== statusFilter) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / PAGE_SIZE));
+  const pagedEvents = filteredEvents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const getTemplateLabel = (t: string) => TEMPLATES.find((x) => x.value === t)?.label || 'ℹ️ 안내';
 
   return (
@@ -249,7 +276,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ===== 이벤트 관리 ===== */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="text-lg md:text-xl font-bold text-gray-800">이벤트 관리</h3>
           <p className="text-xs text-gray-400 mt-0.5">🔄 디스플레이 화면 반영 주기 · 30초</p>
@@ -257,11 +284,38 @@ export default function DashboardPage() {
         <button onClick={openNewModal} className="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ 추가</button>
       </div>
 
+      {/* 필터 바 */}
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          placeholder="제목 / 부제목 검색..."
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        />
+        <select value={rangeMths} onChange={e => setRangeMths(Number(e.target.value))}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-700">
+          <option value={1}>최근 1개월</option>
+          <option value={3}>최근 3개월</option>
+          <option value={6}>최근 6개월</option>
+          <option value={12}>최근 12개월</option>
+          <option value={18}>최근 18개월</option>
+          <option value={24}>최근 24개월</option>
+        </select>
+        <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+          {(['all', 'upcoming', 'ongoing', 'ended'] as const).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`px-3 py-2 transition-colors ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              {s === 'all' ? '전체' : STATUS_CONFIG[s].text}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* 데스크탑 테이블 */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
+              <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">상태</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">출처</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">템플릿</th>
               <th className="text-left px-4 py-3 text-sm font-medium text-gray-500">제목</th>
@@ -272,9 +326,12 @@ export default function DashboardPage() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {pagedEvents.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">등록된 이벤트가 없습니다</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">등록된 이벤트가 없습니다</td></tr>
             ) : pagedEvents.map((e, idx) => (
               <tr key={`${e.id}-${idx}`} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-sm">
+                  {(() => { const s = getEventStatus(e.start, e.end); const c = STATUS_CONFIG[s]; return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${c.cls}`}>{s === 'ongoing' && <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1 animate-pulse" />}{c.text}</span>; })()}
+                </td>
                 <td className="px-4 py-3 text-sm">
                   {e.source === 'calendar' ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
@@ -315,7 +372,7 @@ export default function DashboardPage() {
         </table>
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-            <span className="text-sm text-gray-500">총 {events.length}개 중 {(page - 1) * PAGE_SIZE + 1}~{Math.min(page * PAGE_SIZE, events.length)}</span>
+            <span className="text-sm text-gray-500">총 {filteredEvents.length}개 중 {(page - 1) * PAGE_SIZE + 1}~{Math.min(page * PAGE_SIZE, filteredEvents.length)}</span>
             <div className="flex gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">이전</button>
               <span className="px-3 py-1 text-sm text-gray-600">{page} / {totalPages}</span>
@@ -333,6 +390,7 @@ export default function DashboardPage() {
           <div key={`${e.id}-${idx}`} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2 flex-wrap">
+                {(() => { const s = getEventStatus(e.start, e.end); const c = STATUS_CONFIG[s]; return <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${c.cls}`}>{s === 'ongoing' && <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1 animate-pulse" />}{c.text}</span>; })()}
                 {e.source === 'calendar' ? (
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">캘린더</span>
                 ) : e.source === 'calendar_override' ? (
@@ -357,7 +415,7 @@ export default function DashboardPage() {
         ))}
         {totalPages > 1 && (
           <div className="flex items-center justify-between pt-2 pb-4">
-            <span className="text-xs text-gray-500">{events.length}개 중 {page}/{totalPages}</span>
+            <span className="text-xs text-gray-500">{filteredEvents.length}개 중 {page}/{totalPages}</span>
             <div className="flex gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40">이전</button>
               <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-40">다음</button>
