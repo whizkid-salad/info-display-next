@@ -91,16 +91,15 @@ export default function G1Screen({ active, events }: Props) {
             </div>
           </div>
 
-          {/* 우측: 다음(시작 전) */}
+          {/* 우측: 다음(시작 전) + 로고 */}
           <div className="g1-right">
             <div className="silk-content g1-content">
               {rightItem && <EventContent item={rightItem} showTime />}
             </div>
+            <div className="silk-company">
+              <img src="/display/logo-saladlab.png" alt="Saladlab, Inc." />
+            </div>
           </div>
-        </div>
-
-        <div className="silk-company">
-          <img src="/display/logo-saladlab.png" alt="Saladlab, Inc." />
         </div>
       </div>
     );
