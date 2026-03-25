@@ -178,19 +178,11 @@ export default function DashboardPage() {
   };
 
   const handleDelete = async (event: DisplayEvent) => {
+    // 구글캘린더 이벤트는 단방향 연동 — 삭제 불가 (calendar_override는 override row만 삭제)
+    if (event.source === 'calendar') return;
     if (!confirm('이벤트를 삭제하시겠습니까?')) return;
-    if (event.source === 'calendar' || event.source === 'calendar_override') {
-      // 오버라이드 row가 있으면 먼저 삭제
-      if (event.source === 'calendar_override') {
-        await fetch(`/api/calendar-override?calendarEventId=${event.id}`, { method: 'DELETE' });
-      }
-      // 구글캘린더에서도 삭제
-      if (event.eventIds) {
-        await fetch('/api/calendar', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventIds: event.eventIds }) });
-      } else {
-        const floor = event.floors?.[0] || '6';
-        await fetch(`/api/calendar/${event.id}?floor=${floor}`, { method: 'DELETE' });
-      }
+    if (event.source === 'calendar_override') {
+      await fetch(`/api/calendar-override?calendarEventId=${event.id}`, { method: 'DELETE' });
     } else {
       await fetch('/api/dashboard-events', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: event.id }) });
     }
@@ -364,7 +356,9 @@ export default function DashboardPage() {
                 </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button onClick={() => openEditModal(e)} className="text-blue-500 hover:text-blue-700 text-sm mr-3">수정</button>
-                  <button onClick={() => handleDelete(e)} className="text-red-500 hover:text-red-700 text-sm">삭제</button>
+                  {e.source !== 'calendar' && (
+                    <button onClick={() => handleDelete(e)} className="text-red-500 hover:text-red-700 text-sm">삭제</button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -405,7 +399,9 @@ export default function DashboardPage() {
               </div>
               <div className="flex gap-2">
                 <button onClick={() => openEditModal(e)} className="text-blue-500 text-xs">수정</button>
-                <button onClick={() => handleDelete(e)} className="text-red-500 text-xs">삭제</button>
+                {e.source !== 'calendar' && (
+                  <button onClick={() => handleDelete(e)} className="text-red-500 text-xs">삭제</button>
+                )}
               </div>
             </div>
             <div className="font-medium text-gray-800 text-sm">{e.title}</div>
