@@ -236,8 +236,18 @@ export async function fetchMetricsFromSheets(
     // 빈 행 필터 (A열이 비어있으면 스킵)
     const validRows = allRows.filter((row) => row[0] !== undefined && row[0] !== '');
 
-    // days=0이면 전체, 아니면 마지막 N행
-    const targetRows = days === 0 ? validRows : validRows.slice(-days);
+    // days=0이면 전체, 아니면 날짜 기준 N일치 (행 수가 아닌 실제 날짜 범위)
+    let targetRows = validRows;
+    if (days > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      cutoff.setHours(0, 0, 0, 0);
+      const cutoffStr = cutoff.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+      targetRows = validRows.filter((row) => {
+        const d = parseSheetDate(row[0]);
+        return d !== null && d >= cutoffStr;
+      });
+    }
 
     for (const row of targetRows) {
       const date = parseSheetDate(row[0]);
