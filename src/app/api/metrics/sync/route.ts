@@ -87,9 +87,20 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/metrics/sync
- * 마지막 동기화 상태 + 스프레드시트 테스트 읽기
+ * - Vercel Cron에서 호출 시 (Authorization 헤더 있음): 실제 동기화 수행
+ * - 그 외: 마지막 동기화 상태 + 스프레드시트 테스트 읽기
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+
+  // Vercel Cron 호출이면 실제 동기화 수행
+  if (isCron) {
+    return POST(request);
+  }
+
+  // 일반 상태 조회
   try {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
