@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchVacations } from '@/lib/notion-vacation';
+import { fetchVacations, fetchVacationsRaw } from '@/lib/notion-vacation';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     const url = new URL(request.url);
     const force = url.searchParams.get('force') === '1';
     const dry = url.searchParams.get('dry') === '1';
+    const debug = url.searchParams.get('debug') === '1';
 
     const today = kstNow();
     const dow = today.getUTCDay();
@@ -44,6 +45,24 @@ export async function POST(request: NextRequest) {
     const end = new Date(today);
     end.setUTCDate(today.getUTCDate() + 14);
     const endStr = ymd(end);
+
+    if (debug) {
+      const raw = await fetchVacationsRaw(todayStr, endStr);
+      const sample = raw.slice(0, 3).map(p => ({
+        propertyKeys: Object.keys(p.properties || {}),
+        properties: p.properties,
+      }));
+      const entries = await fetchVacations(todayStr, endStr);
+      return NextResponse.json({
+        ok: true,
+        debug: true,
+        range: { from: todayStr, to: endStr },
+        rawPageCount: raw.length,
+        parsedEntryCount: entries.length,
+        entries,
+        sample,
+      });
+    }
 
     const entries = await fetchVacations(todayStr, endStr);
     const todays = entries.filter(e => e.date === todayStr);
