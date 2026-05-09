@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(2>/dev/null)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: 휴가제도 relation 자동 해석 \\(마스터 DB pageId → 이름\\) *)",
+      "Bash(git push *)"
+    ]
+  }
+}
