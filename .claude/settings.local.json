@@ -5,7 +5,8 @@
       "Bash(2>/dev/null)",
       "Bash(git add *)",
       "Bash(git commit -m 'feat: 휴가제도 relation 자동 해석 \\(마스터 DB pageId → 이름\\) *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git commit -m 'feat: 휴가자 이름 파란색 강조 \\(Card V2 + font color\\) *)"
     ]
   }
 }

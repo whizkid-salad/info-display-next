@@ -77,8 +77,10 @@ export async function POST(request: NextRequest) {
       datesByName.get(e.name)!.add(e.date);
     }
 
+    const NAME_COLOR = '#1a73e8';
     const seen = new Set<string>();
-    const lines: string[] = [];
+    const linesPlain: string[] = [];
+    const linesHtml: string[] = [];
     for (const e of todays) {
       const key = `${e.name}|${e.type}`;
       if (seen.has(key)) continue;
@@ -90,15 +92,17 @@ export async function POST(request: NextRequest) {
         const days = allDates.map(d => Number(d.slice(8, 10))).join(',');
         suffix = `(${days})`;
       }
-      lines.push(`${e.name} - ${e.type}${suffix}`);
+      linesPlain.push(`${e.name} - ${e.type}${suffix}`);
+      linesHtml.push(`<font color="${NAME_COLOR}">${e.name}</font> - ${e.type}${suffix}`);
     }
 
-    const header = `*오늘의 휴가자 ${formatHeader(today)}*`;
-    const body = lines.length > 0 ? lines.join(' / ') : '오늘 휴가자 없음';
-    const message = `${header}\n${body}`;
+    const headerTitle = `오늘의 휴가자 ${formatHeader(today)}`;
+    const bodyPlain = linesPlain.length > 0 ? linesPlain.join(' / ') : '오늘 휴가자 없음';
+    const bodyHtml = linesHtml.length > 0 ? linesHtml.join(' / ') : '오늘 휴가자 없음';
+    const message = `*${headerTitle}*\n${bodyPlain}`;
 
     if (dry) {
-      return NextResponse.json({ ok: true, dry: true, message, count: lines.length });
+      return NextResponse.json({ ok: true, dry: true, message, count: linesPlain.length });
     }
 
     const webhookUrl = process.env.GOOGLE_CHAT_VACATION_WEBHOOK;
@@ -109,10 +113,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const payload = {
+      cardsV2: [
+        {
+          cardId: `vacation-${todayStr}`,
+          card: {
+            header: { title: headerTitle },
+            sections: [
+              {
+                widgets: [{ textParagraph: { text: bodyHtml } }],
+              },
+            ],
+          },
+        },
+      ],
+    };
+
     const res = await fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: message }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -120,7 +140,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Google Chat webhook failed', details }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, count: lines.length, message });
+    return NextResponse.json({ ok: true, count: linesPlain.length, message });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
