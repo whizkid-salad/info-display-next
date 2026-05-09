@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         suffix = `(${days})`;
       }
       linesPlain.push(`${e.name} - ${e.type}${suffix}`);
-      linesHtml.push(`<font color="${NAME_COLOR}">${e.name}</font> - ${e.type}${suffix}`);
+      linesHtml.push(`<b><font color="${NAME_COLOR}">${e.name}</font></b> - ${e.type}${suffix}`);
     }
 
     const headerTitle = `오늘의 휴가자 ${formatHeader(today)}`;
@@ -101,8 +101,10 @@ export async function POST(request: NextRequest) {
     const bodyHtml = linesHtml.length > 0 ? linesHtml.join(' / ') : '오늘 휴가자 없음';
     const message = `*${headerTitle}*\n${bodyPlain}`;
 
+    const buildSha = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local';
+
     if (dry) {
-      return NextResponse.json({ ok: true, dry: true, message, count: linesPlain.length });
+      return NextResponse.json({ ok: true, dry: true, message, count: linesPlain.length, build: buildSha, html: bodyHtml });
     }
 
     const webhookUrl = process.env.GOOGLE_CHAT_VACATION_WEBHOOK;
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Google Chat webhook failed', details }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, count: linesPlain.length, message });
+    return NextResponse.json({ ok: true, count: linesPlain.length, message, build: buildSha });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
