@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchVacations, fetchVacationsRaw, fetchTypeMapDebug, VacationEntry } from '@/lib/notion-vacation';
+import { getSupabaseClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,14 +31,33 @@ function isHalfDay(type: string): boolean {
   return type.includes('반차');
 }
 
+// 풀=1.0, 반=0.5, 반반=0.25
+function vacationWeight(type: string): number {
+  if (type.includes('반반차')) return 0.25;
+  if (type.includes('반차')) return 0.5;
+  return 1.0;
+}
+
 function dateFromYmd(s: string): Date {
   return new Date(`${s}T00:00:00Z`);
 }
 
+async function fetchMemberCount(): Promise<number | null> {
+  try {
+    const supabase = getSupabaseClient();
+    const { count, error } = await supabase
+      .from('members')
+      .select('*', { count: 'exact', head: true });
+    if (error || count == null) return null;
+    return count;
+  } catch {
+    return null;
+  }
+}
+
 function buildTodayBody(
   todays: VacationEntry[],
-  datesByName: Map<string, Set<string>>,
-  todayStr: string
+  datesByName: Map<string, Set<string>>
 ) {
   const seen = new Set<string>();
   const linesPlain: string[] = [];
@@ -65,6 +85,7 @@ function buildTodayBody(
   };
 }
 
+// 주간 섹션: bold/color 없이 plain text. 일자별로 widget 분리.
 function buildWeekBody(entries: VacationEntry[], weekStart: Date, weekEnd: Date) {
   const startStr = ymd(weekStart);
   const endStr = ymd(weekEnd);
@@ -77,9 +98,7 @@ function buildWeekBody(entries: VacationEntry[], weekStart: Date, weekEnd: Date)
   }
 
   const sortedDates = Array.from(byDate.keys()).sort();
-  const linesPlain: string[] = [];
-  const linesHtml: string[] = [];
-
+  const dailyLines: string[] = [];
   for (const d of sortedDates) {
     const date = dateFromYmd(d);
     const m = date.getUTCMonth() + 1;
@@ -88,8 +107,7 @@ function buildWeekBody(entries: VacationEntry[], weekStart: Date, weekEnd: Date)
     const dateLabel = `${m}/${day}(${dowChar})`;
 
     const seen = new Set<string>();
-    const partsPlain: string[] = [];
-    const partsHtml: string[] = [];
+    const parts: string[] = [];
     for (const it of byDate.get(d)!) {
       const k = `${it.name}|${it.type}`;
       if (seen.has(k)) continue;
@@ -97,22 +115,18 @@ function buildWeekBody(entries: VacationEntry[], weekStart: Date, weekEnd: Date)
       const half = isHalfDay(it.type);
       const halfPrefix = half ? `${HALF_ICON} ` : '';
       const annot = half ? `(${it.type})` : '';
-      partsPlain.push(`${halfPrefix}${it.name}${annot}`);
-      partsHtml.push(`${halfPrefix}<b><font color="${NAME_COLOR}">${it.name}</font></b>${annot}`);
+      parts.push(`${halfPrefix}${it.name}${annot}`);
     }
-
-    linesPlain.push(`${dateLabel}  ${partsPlain.join(', ')}`);
-    linesHtml.push(`<b>${dateLabel}</b>  ${partsHtml.join(', ')}`);
+    dailyLines.push(`${dateLabel}  ${parts.join(', ')}`);
   }
 
   return {
-    plain: linesPlain.join('\n'),
-    html: linesHtml.join('<br>'),
-    count: sortedDates.length,
+    plain: dailyLines.join('\n'),
+    dailyLines,
+    count: dailyLines.length,
   };
 }
 
-// 주간 섹션 결정: 월요일=이번주, 금요일=다음주
 function getWeekContext(today: Date): { title: string; start: Date; end: Date } | null {
   const dow = today.getUTCDay();
   if (dow === 1) {
@@ -129,6 +143,20 @@ function getWeekContext(today: Date): { title: string; start: Date; end: Date } 
     return { title: '다음주 휴가자', start, end };
   }
   return null;
+}
+
+function buildUtilizationLine(todays: VacationEntry[], memberCount: number): string {
+  const weightByName = new Map<string, number>();
+  for (const e of todays) {
+    const w = vacationWeight(e.type);
+    weightByName.set(e.name, Math.max(weightByName.get(e.name) || 0, w));
+  }
+  let absentSum = 0;
+  weightByName.forEach(w => { absentSum += w; });
+  const absent = Math.round(absentSum);
+  const present = memberCount - absent;
+  const rate = Math.round((present / memberCount) * 100);
+  return `샐러드랩 가동률 : ${present}/${memberCount} ${rate}%`;
 }
 
 export async function GET(request: NextRequest) {
@@ -155,10 +183,11 @@ export async function POST(request: NextRequest) {
     const endStr = ymd(end);
 
     if (debug) {
-      const [raw, typeMap, entries] = await Promise.all([
+      const [raw, typeMap, entries, memberCount] = await Promise.all([
         fetchVacationsRaw(todayStr, endStr),
         fetchTypeMapDebug(),
         fetchVacations(todayStr, endStr),
+        fetchMemberCount(),
       ]);
       const sample = raw.slice(0, 3).map(p => ({
         propertyKeys: Object.keys(p.properties || {}),
@@ -170,13 +199,17 @@ export async function POST(request: NextRequest) {
         range: { from: todayStr, to: endStr },
         rawPageCount: raw.length,
         parsedEntryCount: entries.length,
+        memberCount,
         typeMap,
         entries,
         sample,
       });
     }
 
-    const entries = await fetchVacations(todayStr, endStr);
+    const [entries, memberCount] = await Promise.all([
+      fetchVacations(todayStr, endStr),
+      fetchMemberCount(),
+    ]);
     const todays = entries.filter(e => e.date === todayStr);
 
     const datesByName = new Map<string, Set<string>>();
@@ -185,14 +218,19 @@ export async function POST(request: NextRequest) {
       datesByName.get(e.name)!.add(e.date);
     }
 
-    const todayBody = buildTodayBody(todays, datesByName, todayStr);
+    const todayBody = buildTodayBody(todays, datesByName);
     const weekCtx = getWeekContext(today);
     const weekBody = weekCtx ? buildWeekBody(entries, weekCtx.start, weekCtx.end) : null;
 
+    const utilLine = memberCount && memberCount > 0 ? buildUtilizationLine(todays, memberCount) : null;
+
+    const todayHtml = utilLine ? `${todayBody.html}<br><br>${utilLine}` : todayBody.html;
+    const todayPlain = utilLine ? `${todayBody.plain}\n\n${utilLine}` : todayBody.plain;
+
     const headerTitle = `오늘의 휴가자 · ${formatHeader(today)}`;
     const message = weekBody
-      ? `*${headerTitle}*\n${todayBody.plain}\n\n*${weekCtx!.title}*\n${weekBody.plain}`
-      : `*${headerTitle}*\n${todayBody.plain}`;
+      ? `*${headerTitle}*\n${todayPlain}\n\n*${weekCtx!.title}*\n${weekBody.plain}`
+      : `*${headerTitle}*\n${todayPlain}`;
 
     const buildSha = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local';
 
@@ -204,8 +242,10 @@ export async function POST(request: NextRequest) {
         count: todayBody.count,
         weekTitle: weekCtx?.title || null,
         weekRange: weekCtx ? { from: ymd(weekCtx.start), to: ymd(weekCtx.end) } : null,
-        weekHtml: weekBody?.html || null,
-        todayHtml: todayBody.html,
+        weekDailyLines: weekBody?.dailyLines || null,
+        utilLine,
+        memberCount,
+        todayHtml,
         build: buildSha,
       });
     }
@@ -216,12 +256,14 @@ export async function POST(request: NextRequest) {
     }
 
     const sections: any[] = [
-      { widgets: [{ textParagraph: { text: todayBody.html } }] },
+      { widgets: [{ textParagraph: { text: todayHtml } }] },
     ];
-    if (weekBody && weekCtx) {
+    if (weekBody && weekCtx && weekBody.dailyLines.length > 0) {
       sections.push({
         header: weekCtx.title,
-        widgets: [{ textParagraph: { text: weekBody.html } }],
+        collapsible: true,
+        uncollapsibleWidgetsCount: 5,
+        widgets: weekBody.dailyLines.map(line => ({ textParagraph: { text: line } })),
       });
     }
 
