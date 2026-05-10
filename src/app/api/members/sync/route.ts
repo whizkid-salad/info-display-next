@@ -29,7 +29,26 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ ok: true, synced: rows.length });
+    let deletedCount = 0;
+    let toDelete: string[] = [];
+    if (rows.length > 0) {
+      const notionIds = new Set(rows.map(r => r.notion_id));
+      const { data: existing } = await supabase.from('members').select('notion_id');
+      toDelete = (existing || [])
+        .map(e => e.notion_id)
+        .filter(id => !notionIds.has(id));
+      if (toDelete.length > 0) {
+        const { data: deleted, error: delErr } = await supabase
+          .from('members')
+          .delete()
+          .in('notion_id', toDelete)
+          .select('notion_id');
+        if (delErr) throw delErr;
+        deletedCount = deleted?.length || 0;
+      }
+    }
+
+    return NextResponse.json({ ok: true, synced: rows.length, deleted: deletedCount, deleteCandidates: toDelete.length });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
