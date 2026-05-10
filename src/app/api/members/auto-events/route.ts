@@ -43,8 +43,9 @@ export async function POST(request: NextRequest) {
     const nextSunday = new Date(nextMonday);
     nextSunday.setUTCDate(nextMonday.getUTCDate() + 6);
 
-    // 1) 노션 → Supabase 멤버 동기화
+    // 1) 노션 → Supabase 멤버 동기화 (노션에서 제거된 멤버는 삭제)
     let syncedCount = 0;
+    let deletedCount = 0;
     try {
       const notionMembers = await fetchNotionMembers();
       const rows = notionMembers.map(m => ({
@@ -57,6 +58,27 @@ export async function POST(request: NextRequest) {
       }));
       await supabase.from('members').upsert(rows, { onConflict: 'notion_id' });
       syncedCount = rows.length;
+
+      if (rows.length > 0) {
+        const notionIds = new Set(rows.map(r => r.notion_id));
+        const { data: existing } = await supabase.from('members').select('notion_id');
+        const toDelete = (existing || [])
+          .map(e => e.notion_id)
+          .filter(id => !notionIds.has(id));
+        if (toDelete.length > 0) {
+          const { data: deleted, error: delErr } = await supabase
+            .from('members')
+            .delete()
+            .in('notion_id', toDelete)
+            .select('notion_id');
+          if (delErr) {
+            console.error('멤버 삭제 실패:', delErr);
+          } else {
+            deletedCount = deleted?.length || 0;
+            console.log(`멤버 삭제: 후보 ${toDelete.length}건 → 실제 삭제 ${deletedCount}건`);
+          }
+        }
+      }
     } catch (e) {
       console.error('Notion sync error (계속 진행):', e);
     }
@@ -138,7 +160,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, synced: syncedCount, created: createdEvents, skipped: skippedEvents, range: { from: nextMonday.toISOString().slice(0,10), to: nextSunday.toISOString().slice(0,10) } });
+    return NextResponse.json({ ok: true, synced: syncedCount, deleted: deletedCount, created: createdEvents, skipped: skippedEvents, range: { from: nextMonday.toISOString().slice(0,10), to: nextSunday.toISOString().slice(0,10) } });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
